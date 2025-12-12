@@ -338,3 +338,15 @@ else:
 
 # 一次性渲染完整的 HTML
 st.markdown(html_content, unsafe_allow_html=True)
+
+# --- 9. 免責聲明 (新增) ---
+st.markdown("""
+<div class="disclaimer-box">
+    <div class="disclaimer-title">⚠️ 免責聲明：</div>
+    本計算機僅供內部教育訓練與模擬試算使用，並非正式保單條款或銷售文件。<br>
+    1. 所有試算數據（如宣告利率、投資報酬率 7% 等）均為<strong>假設值</strong>，僅供參考，不代表未來實際績效，亦不保證最低收益。<br>
+    2. 實際保單權利義務請以保險公司正式條款為準。<br>
+    3. 投資一定有風險，基金投資有賺有賠，申購前應詳閱公開說明書。<br>
+    4. 使用者應自行評估風險，本工具開發者不對任何引用本工具所做出之投資決策負責。
+</div>
+""", unsafe_allow_html=True)
