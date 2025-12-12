@@ -85,8 +85,8 @@ with st.sidebar:
 st.title("📊 PAI 策略全能計算機")
 
 # 圖片顯示區 (請在此替換網址)
-IMG_OFFSET = "https://placehold.co/800x300/006d75/ffffff?text=Strategy+A:+Interest+Cover+Premium&font=roboto"
-IMG_COMPOUND = "https://placehold.co/800x300/531dab/ffffff?text=Strategy+B:+Compound+Interest+Leverage&font=roboto"
+IMG_OFFSET = "https://i.postimg.cc/9Mwkq4c1/Gemini-Generated-Image-57o51457o51457o5.png"
+IMG_COMPOUND = "https://i.postimg.cc/SxKDMXr6/Gemini-Generated-Image-p41a4fp41a4fp41a.png"
 
 if "以息養險" in mode:
     st.image(IMG_OFFSET, use_container_width=True)
