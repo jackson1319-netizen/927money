@@ -300,30 +300,41 @@ v_fund = f"${v['fund']:,.0f}"
 v_loan = f"-${v['loan']:,.0f}"
 v_total = f"${v['total']:,.0f}"
 
-st.markdown('<div class="verify-box">', unsafe_allow_html=True)
-st.markdown('<div class="verify-title">🔍 65 歲資產結算驗證</div>', unsafe_allow_html=True)
-st.markdown(f'<div class="verify-row"><span>[+] PAI 保單現金價值</span> <span>{v_cv}</span></div>', unsafe_allow_html=True)
-st.markdown(f'<div class="verify-row"><span>[+] 基金本金</span> <span>{v_fund}</span></div>', unsafe_allow_html=True)
-
+# 根據模式決定顯示內容
 if current_mode == "offset":
     v_cash = f"${v['cash_out']:,.0f}"
-    st.markdown(f'<div class="verify-row" style="color: #c41d7f;"><span>[+] 累積已領回現金 (Cash Out)</span> <span>{v_cash}</span></div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="verify-row" style="color: #cf1322;"><span>[-] 扣除保單借款</span> <span>{v_loan}</span></div>', unsafe_allow_html=True)
-    st.markdown(f'''
+    
+    # 組合 HTML 字串
+    html_content = f"""
+    <div class="verify-box">
+        <div class="verify-title">🔍 65 歲資產結算驗證</div>
+        <div class="verify-row"><span>[+] PAI 保單現金價值</span> <span>{v_cv}</span></div>
+        <div class="verify-row"><span>[+] 基金本金</span> <span>{v_fund}</span></div>
+        <div class="verify-row" style="color: #c41d7f;"><span>[+] 累積已領回現金 (Cash Out)</span> <span>{v_cash}</span></div>
+        <div class="verify-row" style="color: #cf1322;"><span>[-] 扣除保單借款</span> <span>{v_loan}</span></div>
         <div class="verify-total">
             <span>[=] 總淨資產 (Net Worth)</span> <span>{v_total}</span>
         </div>
         <div class="verify-note">💡 說明：此模式配息優先抵扣保費，多餘的現金領回放口袋，適合重視現金流者。</div>
-    ''', unsafe_allow_html=True)
+    </div>
+    """
 else:
     v_accum = f"${v['accum_wealth']:,.0f}"
-    st.markdown(f'<div class="verify-row" style="color: #722ed1;"><span>[+] 累積配息滾存 (複利)</span> <span>{v_accum}</span></div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="verify-row" style="color: #cf1322;"><span>[-] 扣除保單借款</span> <span>{v_loan}</span></div>', unsafe_allow_html=True)
-    st.markdown(f'''
+    
+    # 組合 HTML 字串
+    html_content = f"""
+    <div class="verify-box">
+        <div class="verify-title">🔍 65 歲資產結算驗證</div>
+        <div class="verify-row"><span>[+] PAI 保單現金價值</span> <span>{v_cv}</span></div>
+        <div class="verify-row"><span>[+] 基金本金</span> <span>{v_fund}</span></div>
+        <div class="verify-row" style="color: #722ed1;"><span>[+] 累積配息滾存 (複利)</span> <span>{v_accum}</span></div>
+        <div class="verify-row" style="color: #cf1322;"><span>[-] 扣除保單借款</span> <span>{v_loan}</span></div>
         <div class="verify-total">
             <span>[=] 總淨資產 (Net Worth)</span> <span>{v_total}</span>
         </div>
         <div class="verify-note">💡 說明：此模式假設配息全部再投入 (7%複利)，適合追求資產最大化者。</div>
-    ''', unsafe_allow_html=True)
+    </div>
+    """
 
-st.markdown('</div>', unsafe_allow_html=True)
+# 一次性渲染完整的 HTML
+st.markdown(html_content, unsafe_allow_html=True)
