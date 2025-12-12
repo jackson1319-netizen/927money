@@ -4,6 +4,42 @@ import numpy as np
 
 # --- 1. 頁面基礎設定 ---
 st.set_page_config(
+    # --- 1.5 密碼驗證模組 ---
+def check_password():
+    """Returns `True` if the user had a correct password."""
+
+    # 設定您的密碼
+    ACTUAL_PASSWORD = "TP927"  # <--- 請在此修改密碼
+
+    def password_entered():
+        """Checks whether a password entered by the user is correct."""
+        if st.session_state["password"] == ACTUAL_PASSWORD:
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]  # don't store password
+        else:
+            st.session_state["password_correct"] = False
+
+    if "password_correct" not in st.session_state:
+        # First run, show input for password.
+        st.text_input(
+            "🔒 請輸入訪問密碼", type="password", on_change=password_entered, key="password"
+        )
+        return False
+    elif not st.session_state["password_correct"]:
+        # Password not correct, show input + error.
+        st.text_input(
+            "🔒 請輸入訪問密碼", type="password", on_change=password_entered, key="password"
+        )
+        st.error("❌ 密碼錯誤")
+        return False
+    else:
+        # Password correct.
+        return True
+
+if not check_password():
+    st.stop()  # ⛔ 如果密碼沒過，程式直接停止，不顯示下方內容
+
+# ... (下方接著原本的 st.markdown CSS 樣式與其他程式碼) ...
     page_title="PAI 策略全能計算機",
     page_icon="📊",
     layout="wide"
