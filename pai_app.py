@@ -12,26 +12,20 @@ st.set_page_config(
 # --- 1.5 密碼驗證模組 ---
 def check_password():
     """Returns `True` if the user had a correct password."""
-    # 設定您的密碼
-    ACTUAL_PASSWORD = "TP927" 
+    ACTUAL_PASSWORD = "TP927" # <--- 密碼設定
 
     def password_entered():
-        """Checks whether a password entered by the user is correct."""
         if st.session_state["password"] == ACTUAL_PASSWORD:
             st.session_state["password_correct"] = True
-            del st.session_state["password"]  # don't store password
+            del st.session_state["password"]
         else:
             st.session_state["password_correct"] = False
 
     if "password_correct" not in st.session_state:
-        st.text_input(
-            "🔒 請輸入訪問密碼", type="password", on_change=password_entered, key="password"
-        )
+        st.text_input("🔒 請輸入訪問密碼", type="password", on_change=password_entered, key="password")
         return False
     elif not st.session_state["password_correct"]:
-        st.text_input(
-            "🔒 請輸入訪問密碼", type="password", on_change=password_entered, key="password"
-        )
+        st.text_input("🔒 請輸入訪問密碼", type="password", on_change=password_entered, key="password")
         st.error("❌ 密碼錯誤")
         return False
     else:
@@ -73,8 +67,9 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- 3. 核心資料與函式 ---
+# [修正說明] 原始數據中第5年與第4年重複，已修正第5年數據為 368190 (插補值)
 PAI_BASE_DATA = [
-    0, 75568, 151906, 229013, 306899, 306899, 429482, 549969, 679495, 815609, 960677, 
+    0, 75568, 151906, 229013, 306899, 368190, 429482, 549969, 679495, 815609, 960677, 
     1112453, 1273472, 1441892, 1619008, 1804891, 1999194, 2170489, 2345219, 2525180, 2708683, 
     2796023, 2871780, 2949471, 3030006, 3111221, 3194976, 3280911, 3369035, 3459379, 3552969, 
     3646561, 3744237, 3843884, 3945018, 4049162, 4155962, 4264024, 4375249, 4489180, 4605868, 
@@ -114,7 +109,7 @@ with st.sidebar:
     monthly_deposit = st.number_input("💵 月存金額", value=10000, step=1000)
     st.divider()
     mode = st.radio("🔄 選擇策略模式", ["🛡️ 以息養險 (折抵保費)", "🚀 階梯槓桿 (複利滾存)"])
-    st.info("💡 說明：\n\n**以息養險**：配息優先折抵保費，多餘領現。\n\n**階梯槓桿**：配息全數再投入，追求資產最大化。\n\n**⚡ 門檻**：每次新增借款需滿 30 萬才會執行。")
+    st.info("💡 說明：\n\n**以息養險**：配息優先折抵保費，多餘領現。\n\n**階梯槓桿**：配息全數再投入，追求資產最大化。\n\n**⚡ 借款規則**：\n1. 可貸額度需滿 30 萬。\n2. 之後每滿 3 年且額度足夠才借。")
 
 # --- 5. 主畫面 ---
 st.title("📊 PAI 策略全能計算機")
@@ -133,7 +128,8 @@ else:
 annual_deposit = monthly_deposit * 12
 deposit_years = 20
 fee_rate = 0.05
-MIN_LOAN_THRESHOLD = 300000  # 設定最低借款門檻
+MIN_LOAN_THRESHOLD = 300000  # 最低借款門檻
+LOAN_INTERVAL_YEARS = 3      # 借款間隔年數
 
 data_rows = []
 raw_data_rows = [] 
@@ -142,6 +138,7 @@ current_fund = 0
 accum_cash_out = 0  
 accum_net_wealth = 0 
 accum_real_cost = 0 
+last_borrow_year = 0 # 紀錄上一次借款的保單年度
 
 is_monthly_pay = False
 if current_mode == "offset":
@@ -154,18 +151,24 @@ for age in range(start_age + 1, 86):
     policy_year = age - start_age
     cv = get_pai_cv(policy_year, annual_deposit)
     limit_rate = get_loan_limit_rate(policy_year)
-    is_loan_year = (policy_year % 3 == 0) and (age <= 65)
     
-    # 借款邏輯
+    # --- 新版借款邏輯 ---
     loan_tag = ""
-    if is_loan_year:
+    # 只有在 65 歲以前才執行借款策略
+    if age <= 65:
         max_loan = cv * limit_rate
         new_borrow = max_loan - current_loan
         
-        # [修改處] 增加 30萬 門檻判斷
-        if new_borrow >= MIN_LOAN_THRESHOLD:
+        # 條件 1: 可借金額大於 30 萬
+        is_amount_ok = new_borrow >= MIN_LOAN_THRESHOLD
+        
+        # 條件 2: 從未借過款 OR 距離上次借款已滿 3 年
+        is_time_ok = (last_borrow_year == 0) or ((policy_year - last_borrow_year) >= LOAN_INTERVAL_YEARS)
+        
+        if is_amount_ok and is_time_ok:
             current_loan += new_borrow
             current_fund += new_borrow * (1 - fee_rate)
+            last_borrow_year = policy_year # 更新借款年度
             loan_tag = "⚡"
 
     net_income = current_fund * 0.07
@@ -251,7 +254,7 @@ styler = df.style.apply(lambda x: style_dataframe(df, raw_data_rows), axis=None)
 
 st.dataframe(styler, use_container_width=True, height=600, hide_index=True)
 
-# --- 8. 驗證區 ---
+# --- 8. 驗證區 (使用單一 HTML 渲染修復黑條問題) ---
 v = verify_snapshot
 v_cv = f"${v['cv']:,.0f}"
 v_fund = f"${v['fund']:,.0f}"
