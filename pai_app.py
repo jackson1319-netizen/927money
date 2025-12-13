@@ -67,7 +67,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- 3. 核心資料與函式 ---
-# [修正說明] 原始數據中第5年與第4年重複，已修正第5年數據為 368190 (插補值)
 PAI_BASE_DATA = [
     0, 75568, 151906, 229013, 306899, 368190, 429482, 549969, 679495, 815609, 960677, 
     1112453, 1273472, 1441892, 1619008, 1804891, 1999194, 2170489, 2345219, 2525180, 2708683, 
@@ -138,7 +137,7 @@ current_fund = 0
 accum_cash_out = 0  
 accum_net_wealth = 0 
 accum_real_cost = 0 
-last_borrow_year = 0 # 紀錄上一次借款的保單年度
+last_borrow_year = 0 
 
 is_monthly_pay = False
 if current_mode == "offset":
@@ -154,6 +153,8 @@ for age in range(start_age + 1, 86):
     
     # --- 新版借款邏輯 ---
     loan_tag = ""
+    is_borrowing_year = False # 標記今年是否有借款
+
     # 只有在 65 歲以前才執行借款策略
     if age <= 65:
         max_loan = cv * limit_rate
@@ -168,8 +169,9 @@ for age in range(start_age + 1, 86):
         if is_amount_ok and is_time_ok:
             current_loan += new_borrow
             current_fund += new_borrow * (1 - fee_rate)
-            last_borrow_year = policy_year # 更新借款年度
+            last_borrow_year = policy_year 
             loan_tag = "⚡"
+            is_borrowing_year = True
 
     net_income = current_fund * 0.07
     nominal_premium = annual_deposit if policy_year <= deposit_years else 0
@@ -177,6 +179,11 @@ for age in range(start_age + 1, 86):
 
     row_display = {}
     row_raw = {} 
+
+    # 處理借款顯示字串：如果有借款，加上成數
+    loan_display_str = format_money(-current_loan)
+    if is_borrowing_year:
+        loan_display_str += f" ({int(limit_rate*100)}%)"
 
     if current_mode == "offset":
         actual_pay_yearly = nominal_premium - net_income
@@ -192,7 +199,7 @@ for age in range(start_age + 1, 86):
         row_display["③實繳金額"] = format_money(display_val, is_receive_column=True)
         row_display["④累積實繳"] = format_money(accum_real_cost)
         row_display["⑤PAI解約金"] = format_money(cv)
-        row_display["⑥保單借款"] = format_money(-current_loan)
+        row_display["⑥保單借款"] = loan_display_str # 使用處理過的字串
         row_display["⑦基金本金"] = format_money(current_fund)
         row_display["⑧總淨資產"] = format_money(total_net_asset)
 
@@ -208,7 +215,7 @@ for age in range(start_age + 1, 86):
         row_display["①當年存入"] = format_money(actual_deposit)
         row_display["②累積本金"] = format_money(acc_deposit)
         row_display["③PAI解約金"] = format_money(cv)
-        row_display["④保單借款"] = format_money(-current_loan)
+        row_display["④保單借款"] = loan_display_str # 使用處理過的字串
         row_display["⑤基金本金"] = format_money(current_fund)
         row_display["⑥年度淨配息"] = format_money(net_income)
         row_display["⑦累積配息(複利)"] = format_money(accum_net_wealth)
@@ -254,7 +261,7 @@ styler = df.style.apply(lambda x: style_dataframe(df, raw_data_rows), axis=None)
 
 st.dataframe(styler, use_container_width=True, height=600, hide_index=True)
 
-# --- 8. 驗證區 (使用單一 HTML 渲染修復黑條問題) ---
+# --- 8. 驗證區 ---
 v = verify_snapshot
 v_cv = f"${v['cv']:,.0f}"
 v_fund = f"${v['fund']:,.0f}"
