@@ -150,7 +150,7 @@ for age in range(start_age + 1, 86):
     policy_year = age - start_age
     cv = get_pai_cv(policy_year, annual_deposit)
     limit_rate = get_loan_limit_rate(policy_year)
-    
+     
     # --- 新版借款邏輯 ---
     loan_tag = ""
     is_borrowing_year = False # 標記今年是否有借款
@@ -184,6 +184,9 @@ for age in range(start_age + 1, 86):
     loan_display_str = format_money(-current_loan)
     if is_borrowing_year:
         loan_display_str += f" ({int(limit_rate*100)}%)"
+
+    # --- [修改] 在這裡插入第一欄：保單年度 ---
+    row_display["保單年度"] = policy_year
 
     if current_mode == "offset":
         actual_pay_yearly = nominal_premium - net_income
