@@ -67,6 +67,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- 3. 核心資料與函式 ---
+# PAI 解約金數據
 PAI_BASE_DATA = [
     0, 75568, 151906, 229013, 306899, 368190, 429482, 549969, 679495, 815609, 960677, 
     1112453, 1273472, 1441892, 1619008, 1804891, 1999194, 2170489, 2345219, 2525180, 2708683, 
@@ -78,12 +79,32 @@ PAI_BASE_DATA = [
     9097991, 9280402, 9471102, 9674587, 9895415, 10142999, 10414816, 10696778, 10992809, 11304075, 
     11632752, 11979388, 12355444, 12765735, 13233318, 13766422
 ]
+
+# PAI 身故金數據 (年度末身故/完全失能時可領總金額) 
+PAI_DEATH_DATA = [
+    0, 170000, 340185, 510558, 681120, 858687, 6849302, 6807176, 6772672, 6745104, 6724209, 
+    6710612, 6702492, 6701107, 6706363, 6718151, 6735241, 6760773, 6791657, 6828419, 6871177, 
+    6915181, 6946482, 6977752, 7009859, 7042364, 7075362, 7109371, 7143494, 7178647, 7214892, 
+    7250015, 7288018, 7324779, 7363849, 7402672, 7442997, 7483378, 7525738, 7567382, 7611693, 
+    7655608, 7702077, 7747425, 7796685, 7845305, 7895147, 7947001, 8000527, 8055223, 8111151, 
+    8168164, 8226834, 8286878, 8350332, 8414295, 8481377, 8549089, 8618573, 8691615, 8766065, 
+    8842680, 8923339, 9005279, 9090404, 9178873, 9270456, 9365880, 9463047, 9566182, 9672209, 
+    9782518, 9897691, 10018324, 10142410, 10271878, 10408931, 10597577, 10866775, 11149518, 
+    11446957, 11761249, 12095401, 12455963, 12847598, 13280185, 13766422
+]
+
 BASE_PREMIUM = 120003
 
 def get_pai_cv(year, annual_deposit):
     if year <= 0: return 0
     idx = year if year < len(PAI_BASE_DATA) else len(PAI_BASE_DATA) - 1
     base = PAI_BASE_DATA[idx]
+    return base * (annual_deposit / BASE_PREMIUM)
+
+def get_pai_death(year, annual_deposit):
+    if year <= 0: return 0
+    idx = year if year < len(PAI_DEATH_DATA) else len(PAI_DEATH_DATA) - 1
+    base = PAI_DEATH_DATA[idx]
     return base * (annual_deposit / BASE_PREMIUM)
 
 def get_loan_limit_rate(year):
@@ -177,6 +198,9 @@ for age in range(start_age + 1, 86):
     nominal_premium = annual_deposit if policy_year <= deposit_years else 0
     total_net_asset = 0
 
+    # 計算身故金 (保障 + 投資 - 負債)
+    death_benefit_base = get_pai_death(policy_year, annual_deposit)
+
     row_display = {}
     row_raw = {} 
 
@@ -185,7 +209,6 @@ for age in range(start_age + 1, 86):
     if is_borrowing_year:
         loan_display_str += f" ({int(limit_rate*100)}%)"
 
-    # --- [修改] 在這裡插入第一欄：保單年度 ---
     row_display["保單年度"] = policy_year
 
     if current_mode == "offset":
@@ -196,15 +219,19 @@ for age in range(start_age + 1, 86):
         total_net_asset = cv + current_fund + accum_cash_out - current_loan
         display_val = actual_pay_yearly / 12 if is_monthly_pay else actual_pay_yearly
         
+        # 以息養險模式下的總身故金：保單身故 + 基金本金 - 借款
+        total_death_benefit = death_benefit_base + current_fund - current_loan
+        
         row_display["年齡"] = f"{age} {loan_tag}"
         row_display["①應繳年保費"] = format_money(nominal_premium)
         row_display["②配息抵扣"] = format_money(net_income)
         row_display["③實繳金額"] = format_money(display_val, is_receive_column=True)
         row_display["④累積實繳"] = format_money(accum_real_cost)
         row_display["⑤PAI解約金"] = format_money(cv)
-        row_display["⑥保單借款"] = loan_display_str # 使用處理過的字串
+        row_display["⑥保單借款"] = loan_display_str 
         row_display["⑦基金本金"] = format_money(current_fund)
         row_display["⑧總淨資產"] = format_money(total_net_asset)
+        row_display["⑨身故金"] = format_money(total_death_benefit) # 新增
 
         row_raw = {"loan_year": loan_tag == "⚡", "real_pay_val": display_val, "net_asset": total_net_asset}
 
@@ -213,16 +240,20 @@ for age in range(start_age + 1, 86):
         acc_deposit = annual_deposit * policy_year if policy_year <= deposit_years else annual_deposit * deposit_years
         accum_net_wealth = (accum_net_wealth * 1.07) + net_income
         total_net_asset = cv + current_fund + accum_net_wealth - current_loan
+
+        # 階梯槓桿模式下的總身故金：保單身故 + 基金本金 + 累積配息 - 借款
+        total_death_benefit = death_benefit_base + current_fund + accum_net_wealth - current_loan
         
         row_display["年齡"] = f"{age} {loan_tag}"
         row_display["①當年存入"] = format_money(actual_deposit)
         row_display["②累積本金"] = format_money(acc_deposit)
         row_display["③PAI解約金"] = format_money(cv)
-        row_display["④保單借款"] = loan_display_str # 使用處理過的字串
+        row_display["④保單借款"] = loan_display_str 
         row_display["⑤基金本金"] = format_money(current_fund)
         row_display["⑥年度淨配息"] = format_money(net_income)
         row_display["⑦累積配息(複利)"] = format_money(accum_net_wealth)
         row_display["⑧總淨資產"] = format_money(total_net_asset)
+        row_display["⑨身故金"] = format_money(total_death_benefit) # 新增
 
         row_raw = {"loan_year": loan_tag == "⚡", "net_asset": total_net_asset}
 
@@ -244,8 +275,12 @@ def style_dataframe(df_input, raw_data):
     for i, raw in enumerate(raw_data):
         if raw["loan_year"]:
             df_style.iloc[i, :] = 'background-color: #fffbe6;'
-            
-        df_style.iloc[i, -1] += 'background-color: #e6f7ff; color: #096dd9; font-weight: bold;'
+        
+        # 總淨資產樣式
+        df_style.iloc[i, df_input.columns.get_loc("⑧總淨資產")] += 'background-color: #e6f7ff; color: #096dd9; font-weight: bold;'
+        
+        # 身故金樣式：暖金背景，深橘金文字
+        df_style.iloc[i, df_input.columns.get_loc("⑨身故金")] += 'background-color: #fff7e6; color: #d46b08; font-weight: bold;'
         
         if current_mode == "offset":
             val = raw["real_pay_val"]
