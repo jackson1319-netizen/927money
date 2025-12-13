@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>配息小金庫專案</title>
+    <style>
+        /* --- 基礎設定 --- */
+        ::-webkit-scrollbar { display: none; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0; padding: 10px;
+            background-color: #f0f2f5;
+            color: #1d1d1f;
+            -ms-overflow-style: none; scrollbar-width: none;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-color: #f0f2f5;
+            --card-bg: #ffffff;
+            --text-main: #1d1d1f;
+            --text-secondary: #86868b;
+            --accent-blue: #0071e3;
+            --success-green: #34c759;
+            --error-red: #ff3b30;
+            --border-radius: 16px;
+            --input-bg: #f5f5f7;
+            --brand-color: #006d75;
+        }
+
+        /* --- 登入遮罩 --- */
+        #loginOverlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #f0f2f5; z-index: 9999; display: flex;
+            align-items: center; justify-content: center; backdrop-filter: blur(5px);
+        }
+        .login-card {
+            background: white; padding: 30px; border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; width: 300px;
+        }
+        .login-title { color: var(--brand-color); font-size: 20px; font-weight: bold; margin-bottom: 20px; }
+        .login-input { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; box-sizing: border-box; }
+        .login-btn { width: 100%; padding: 10px; background-color: var(--brand-color); color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; font-weight: bold; }
+        .login-btn:hover { background-color: #005057; }
+        .error-msg { color: var(--error-red); font-size: 13px; margin-top: 10px; display: none; }
+
+        /* --- 主容器 --- */
+        .container {
+            width: 100%; max-width: 100%;
+            background: var(--card-bg);
+            padding: 25px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            box-sizing: border-box; margin: 0 auto;
+        }
+
+        /* --- Banner 圖片區 --- */
+        .banner-container {
+            width: 100%;
+            margin-bottom: 20px;
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            display: none; /* 預設隱藏，有圖片時才顯示 */
+        }
+        .banner-img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        header { text-align: center; margin-bottom: 20px; padding-top: 5px; }
+        h2 { font-weight: 600; font-size: 1.5rem; margin: 0 0 5px 0; letter-spacing: -0.5px; color: var(--text-main); }
+        .subtitle { font-size: 0.85rem; color: var(--text-secondary); font-weight: 400; }
+
+        /* 匯率切換 */
+        .currency-toggle-wrapper {
+            display: flex; justify-content: center; align-items: center;
+            margin-bottom: 20px; padding: 10px;
+            background: #f9f9fa; border-radius: 12px;
+            width: fit-content; margin-left: auto; margin-right: auto;
+        }
+        .rate-info { font-size: 0.8rem; color: var(--text-secondary); margin-right: 12px; font-family: monospace; }
+        
+        /* Switch 開關 */
+        .switch { position: relative; display: inline-block; width: 46px; height: 26px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #e5e5e5; transition: .4s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        input:checked + .slider { background-color: var(--accent-blue); }
+        input:checked + .slider:before { transform: translateX(20px); }
+        .currency-label { font-size: 0.85rem; font-weight: 600; margin-left: 10px; color: var(--text-main); min-width: 35px; }
+
+        h3.section-title {
+            font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);
+            text-transform: uppercase; letter-spacing: 1.2px;
+            margin-top: 25px; margin-bottom: 15px; padding-bottom: 8px;
+            border-bottom: 1px solid #e5e5e5; display: flex; align-items: center;
+        }
+        h3.section-title::before {
+            content: ''; display: inline-block; width: 6px; height: 6px;
+            background-color: var(--accent-blue); border-radius: 50%; margin-right: 8px;
+        }
+
+        .input-group { margin-bottom: 20px; text-align: center; }
+        label { display: block; margin-bottom: 10px; font-size: 0.9rem; font-weight: 500; color: var(--text-main); }
+        input[type="number"] {
+            width: 100%; max-width: 100%; box-sizing: border-box;
+            padding: 15px; border-radius: 12px; border: 1px solid transparent;
+            background-color: var(--input-bg); font-size: 1.4rem; font-weight: 600;
+            text-align: center; color: var(--text-main); outline: none; transition: all 0.2s ease;
+        }
+        input[type="number"]:focus { background-color: #fff; box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.15); border-color: var(--accent-blue); }
+
+        button {
+            background-color: var(--text-main); color: white; padding: 15px;
+            border: none; border-radius: 12px; font-size: 1rem; font-weight: 500;
+            width: 100%; cursor: pointer; transition: transform 0.1s, background-color 0.2s;
+            display: block; margin: 0 auto;
+        }
+        button:hover { background-color: #000; transform: scale(1.01); }
+        button:active { transform: scale(0.98); }
+
+        .result-box { margin-top: 15px; }
+        .result-row { display: flex; justify-content: space-between; align-items: baseline; padding: 12px 0; font-size: 0.95rem; border-bottom: 1px dashed #f0f0f0; }
+        .result-row:last-child { border-bottom: none; }
+        .result-label { color: var(--text-secondary); font-weight: 400; }
+        .result-value { font-weight: 600; color: var(--text-main); font-feature-settings: "tnum"; }
+        .highlight-blue { color: var(--accent-blue); }
+
+        .highlight-total-card {
+            margin-top: 25px; padding: 25px;
+            background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%);
+            border: 1px solid rgba(0, 113, 227, 0.1); border-radius: 16px;
+            text-align: center; box-shadow: 0 4px 15px rgba(0, 113, 227, 0.05);
+        }
+        .highlight-total-card .result-label { display: block; margin-bottom: 5px; color: var(--accent-blue); font-size: 0.85rem; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
+        .highlight-total-card .result-value { font-size: 2rem; color: var(--text-main); letter-spacing: -1px;}
+
+        .status-badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
+        .status-success { background-color: rgba(52, 199, 89, 0.1); color: var(--success-green); }
+        .status-error { background-color: rgba(255, 59, 48, 0.1); color: var(--error-red); }
+    </style>
+</head>
+<body>
+
+<div id="loginOverlay">
+    <div class="login-card">
+        <div class="login-title">🔒 請輸入訪問密碼</div>
+        <input type="password" id="passwordInput" class="login-input" placeholder="輸入密碼..." onkeyup="if(event.keyCode===13) checkPassword()">
+        <button class="login-btn" onclick="checkPassword()">解鎖進入</button>
+        <div id="errorMsg" class="error-msg">❌ 密碼錯誤，請重試</div>
+    </div>
+</div>
+
+<div class="container">
+    
+    <div class="banner-container" id="bannerContainer">
+        <img src="" alt="Banner" class="banner-img" id="bannerImg">
+    </div>
+
+    <header>
+        <h2>配息小金庫專案</h2>
+        <div class="subtitle">專屬投資組合配置系統</div>
+    </header>
+
+    <div class="currency-toggle-wrapper">
+        <span class="rate-info">匯率參考: 31.32</span>
+        <label class="switch">
+            <input type="checkbox" id="currencyToggle" onchange="toggleCurrency()">
+            <span class="slider"></span>
+        </label>
+        <span class="currency-label" id="currencyText">TWD</span>
+    </div>
+    
+    <div class="input-group">
+        <label id="inputLabel" for="principal">輸入總資金規模 (NT$)</label>
+        <input type="number" id="principal" value="10000000" min="0" step="10000" placeholder="例如：10000000">
+    </div>
+
+    <div class="input-group">
+        <label for="payoutRate">預期年化配息率 (%)</label>
+        <input type="number" id="payoutRate" value="8" min="0" step="0.1" placeholder="例如：8">
+    </div>
+    
+    <button onclick="calculatePlan()">更新計算結果</button>
+
+    <div class="result-box" id="results">
+    </div>
+</div>
+
+<script>
+    // ==========================================
+    // 🔒 設定您的密碼
+    const MY_ACCESS_PASSWORD = "TP927"; 
+
+    // 🖼️ 設定 Banner 圖片網址 (若無圖片，請留空或刪除網址)
+    const BANNER_IMAGE_URL = "https://i.postimg.cc/T2nftvNz/Gemini-Generated-Image-i77458i77458i774.png"; 
+    // ==========================================
+
+    function checkPassword() {
+        const input = document.getElementById('passwordInput').value;
+        const overlay = document.getElementById('loginOverlay');
+        const errorMsg = document.getElementById('errorMsg');
+        
+        if (input === MY_ACCESS_PASSWORD) {
+            overlay.style.opacity = '0';
+            setTimeout(() => {
+                overlay.style.display = 'none';
+            }, 300);
+        } else {
+            errorMsg.style.display = 'block';
+            document.getElementById('passwordInput').value = '';
+            document.getElementById('passwordInput').focus();
+        }
+    }
+
+    // 初始化 Banner
+    document.addEventListener("DOMContentLoaded", function() {
+        if (BANNER_IMAGE_URL && BANNER_IMAGE_URL.trim() !== "") {
+            document.getElementById('bannerImg').src = BANNER_IMAGE_URL;
+            document.getElementById('bannerContainer').style.display = 'block';
+        }
+    });
+
+    const EXCHANGE_RATE = 31.32;
+    let isUSD = false;
+
+    function formatCurrency(num) {
+        if (isUSD) {
+            return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        } else {
+            return Math.round(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        }
+    }
+    
+    function toggleCurrency() {
+        const toggle = document.getElementById('currencyToggle');
+        const label = document.getElementById('currencyText');
+        const inputLabel = document.getElementById('inputLabel');
+        const inputField = document.getElementById('principal');
+        
+        let currentVal = parseFloat(inputField.value);
+        if (isNaN(currentVal)) currentVal = 0;
+
+        isUSD = toggle.checked;
+
+        if (isUSD) {
+            label.innerText = "USD";
+            inputLabel.innerText = "輸入總資金規模 (USD)";
+            inputField.value = (currentVal / EXCHANGE_RATE).toFixed(2);
+        } else {
+            label.innerText = "TWD";
+            inputLabel.innerText = "輸入總資金規模 (NT$)";
+            inputField.value = Math.round(currentVal * EXCHANGE_RATE);
+        }
+        calculatePlan();
+    }
+
+    function getFeeRate(investmentPreFeeUSD) {
+        let investmentTWD = isUSD ? investmentPreFeeUSD * EXCHANGE_RATE : investmentPreFeeUSD;
+        if (investmentTWD >= 10000000) return 0.02;
+        else if (investmentTWD >= 5000000) return 0.03;
+        else if (investmentTWD >= 2000000) return 0.04;
+        else return 0.05;
+    }
+    
+    function calculateSavingsPremium(P, PAYOUT_RATE) {
+        let X_guess = P / 2;
+        for (let i = 0; i < 10; i++) { 
+            const feeRate = getFeeRate(X_guess);
+            const S_new = (P * (1 - feeRate) * PAYOUT_RATE) / (1 + (1 - feeRate) * PAYOUT_RATE);
+            const X_new = P - S_new;
+            if (getFeeRate(X_new) === feeRate) return S_new;
+            X_guess = X_new;
+        }
+        const finalFeeRate = getFeeRate(P - X_guess);
+        return (P * (1 - finalFeeRate) * PAYOUT_RATE) / (1 + (1 - finalFeeRate) * PAYOUT_RATE);
+    }
+
+    function calculatePlan() {
+        // 取得使用者輸入的配息率
+        let rateInput = parseFloat(document.getElementById('payoutRate').value);
+        
+        // 若輸入無效或小於等於0，則使用預設值8
+        if (isNaN(rateInput) || rateInput <= 0) {
+            rateInput = 8;
+        }
+
+        const PAYOUT_RATE = rateInput / 100; // 轉換為小數點 (例如 8 -> 0.08)
+        const TERM_YEARS = 6;
+        const principalAmount = parseFloat(document.getElementById('principal').value);
+
+        if (isNaN(principalAmount) || principalAmount <= 0) {
+            document.getElementById('results').innerHTML = '<p style="color: #ff3b30; text-align:center; margin-top:20px;">請輸入有效的金額。</p>';
+            return;
+        }
+
+        const annualSavingsPremium = calculateSavingsPremium(principalAmount, PAYOUT_RATE);
+        const investmentPreFee = principalAmount - annualSavingsPremium;
+        const applicableFeeRate = getFeeRate(investmentPreFee);
+        const totalFee = investmentPreFee * applicableFeeRate;
+        const investmentBase = investmentPreFee - totalFee;
+        const annualPayout = investmentBase * PAYOUT_RATE;
+        const totalSavingsPaid = annualSavingsPremium * TERM_YEARS;
+        const totalAssetAfterSixYears = totalSavingsPaid + investmentPreFee;
+        
+        const tolerance = isUSD ? 0.1 : 1; 
+        const isBalanced = Math.abs(annualPayout - annualSavingsPremium) < tolerance;
+        
+        const validationStatus = isBalanced ? 
+            '<span class="status-badge status-success">✓ 系統平衡</span>' : 
+            '<span class="status-badge status-error">⚠ 需要調整</span>';
+
+        const symbol = isUSD ? "USD " : "NT$ ";
+
+        const resultsHTML = `
+            <h3 class="section-title">分紅保單配置</h3>
+            <div class="result-row">
+                <span class="result-label">年繳保費</span>
+                <span class="result-value">${symbol}${formatCurrency(annualSavingsPremium)}</span>
+            </div>
+            <div class="result-row">
+                <span class="result-label">六年總投入</span>
+                <span class="result-value">${symbol}${formatCurrency(totalSavingsPaid)}</span>
+            </div>
+            
+            <h3 class="section-title">投資型保單配置</h3>
+            <div class="result-row">
+                <span class="result-label">投資總額</span>
+                <span class="result-value">${symbol}${formatCurrency(investmentPreFee)}</span>
+            </div>
+            <div class="result-row">
+                <span class="result-label">適用手續費率 (依台幣級距)</span>
+                <span class="result-value highlight-blue">${(applicableFeeRate * 100).toFixed(0)}%</span>
+            </div>
+            <div class="result-row">
+                <span class="result-label">扣除手續費</span>
+                <span class="result-value text-secondary" style="font-size:0.9em;">-${symbol}${formatCurrency(totalFee)}</span>
+            </div>
+            <div class="result-row" style="border-top: 1px dashed #eee; padding-top:10px; margin-top:5px;">
+                <span class="result-label">實際進場本金</span>
+                <span class="result-value highlight-blue">${symbol}${formatCurrency(investmentBase)}</span>
+            </div>
+            
+            <h3 class="section-title">現金流檢視</h3>
+            <div class="result-row">
+                <span class="result-label">預期年化配息 (${rateInput}%)</span>
+                <span class="result-value" style="color:var(--success-green);">${symbol}${formatCurrency(annualPayout)}</span>
+            </div>
+            <div class="result-row">
+                <span class="result-label">配息覆蓋保費</span>
+                <span class="result-value">${validationStatus}</span>
+            </div>
+            
+            <div class="highlight-total-card">
+                <span class="result-label">六年後總資產預估</span>
+                <span class="result-value">${symbol}${formatCurrency(totalAssetAfterSixYears)}</span>
+            </div>
+        `;
+        
+        document.getElementById('results').innerHTML = resultsHTML;
+    }
+
+    document.addEventListener('DOMContentLoaded', calculatePlan);
+</script>
+
+</body>
+</html>
