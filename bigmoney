@@ -3,152 +3,247 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>配息小金庫專案</title>
+    <title>配息小金庫專案 v4.9 (視覺統一版)</title>
     <style>
         /* --- 基礎設定 --- */
         ::-webkit-scrollbar { display: none; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            margin: 0; padding: 10px;
-            background-color: #f0f2f5;
-            color: #1d1d1f;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 0; padding: 15px;
+            background-color: #f4f6f8;
+            color: #333;
             -ms-overflow-style: none; scrollbar-width: none;
             box-sizing: border-box;
         }
 
         :root {
-            --bg-color: #f0f2f5;
-            --card-bg: #ffffff;
-            --text-main: #1d1d1f;
-            --text-secondary: #86868b;
-            --accent-blue: #0071e3;
-            --success-green: #34c759;
-            --error-red: #ff3b30;
-            --border-radius: 16px;
-            --input-bg: #f5f5f7;
-            --brand-color: #006d75;
+            --primary-color: #1a3c5e; /* 深海軍藍 */
+            --accent-color: #c5a065;  /* 香檳金 */
+            --bg-light: #ffffff;
+            --bg-offset: #f8f9fa;
+            --text-dark: #2c3e50;
+            --text-gray: #7f8c8d;
+            --border-radius: 12px;
+            --input-bg: #eef2f5;
+            --success-green: #27ae60;
+            --alert-red: #c0392b; 
         }
 
         /* --- 登入遮罩 --- */
         #loginOverlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: #f0f2f5; z-index: 9999; display: flex;
-            align-items: center; justify-content: center; backdrop-filter: blur(5px);
+            background: #f4f6f8; z-index: 9999; display: flex;
+            align-items: center; justify-content: center; backdrop-filter: blur(8px);
         }
         .login-card {
-            background: white; padding: 30px; border-radius: 12px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; width: 300px;
+            background: white; padding: 40px; border-radius: 16px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1); text-align: center; width: 320px;
+            border-top: 5px solid var(--primary-color);
         }
-        .login-title { color: var(--brand-color); font-size: 20px; font-weight: bold; margin-bottom: 20px; }
-        .login-input { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; box-sizing: border-box; }
-        .login-btn { width: 100%; padding: 10px; background-color: var(--brand-color); color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; font-weight: bold; }
-        .login-btn:hover { background-color: #005057; }
-        .error-msg { color: var(--error-red); font-size: 13px; margin-top: 10px; display: none; }
+        .login-title { color: var(--primary-color); font-size: 22px; font-weight: 700; margin-bottom: 25px; letter-spacing: 1px; }
+        .login-input { width: 100%; padding: 12px; margin-bottom: 20px; border: 1px solid #dcdfe6; border-radius: 8px; font-size: 16px; box-sizing: border-box; transition: 0.3s; }
+        .login-input:focus { border-color: var(--primary-color); outline: none; }
+        .login-btn { width: 100%; padding: 12px; background-color: var(--primary-color); color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; font-weight: 600; letter-spacing: 1px; transition: 0.3s; }
+        .login-btn:hover { background-color: #132c45; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(26, 60, 94, 0.2); }
+        .error-msg { color: var(--alert-red); font-size: 14px; margin-top: 15px; display: none; }
 
         /* --- 主容器 --- */
         .container {
-            width: 100%; max-width: 100%;
-            background: var(--card-bg);
-            padding: 25px;
+            width: 100%; max-width: 1000px;
+            background: var(--bg-light);
+            padding: 30px;
             border-radius: var(--border-radius);
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-            box-sizing: border-box; margin: 0 auto;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05);
+            margin: 0 auto;
         }
 
-        /* --- Banner 圖片區 --- */
-        .banner-container {
-            width: 100%;
-            margin-bottom: 20px;
-            border-radius: var(--border-radius);
-            overflow: hidden;
-            display: none; /* 預設隱藏，有圖片時才顯示 */
-        }
-        .banner-img {
-            width: 100%;
-            height: auto;
-            display: block;
-        }
+        /* --- Header --- */
+        header { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #eee; }
+        h2 { font-weight: 700; font-size: 1.8rem; margin: 0 0 8px 0; color: var(--primary-color); }
+        .subtitle { font-size: 0.95rem; color: var(--text-gray); font-weight: 400; letter-spacing: 1px; }
 
-        header { text-align: center; margin-bottom: 20px; padding-top: 5px; }
-        h2 { font-weight: 600; font-size: 1.5rem; margin: 0 0 5px 0; letter-spacing: -0.5px; color: var(--text-main); }
-        .subtitle { font-size: 0.85rem; color: var(--text-secondary); font-weight: 400; }
+        /* --- Banner --- */
+        .banner-container { width: 100%; margin-bottom: 25px; border-radius: var(--border-radius); overflow: hidden; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .banner-img { width: 100%; height: auto; display: block; }
 
-        /* 匯率切換 */
+        /* --- 控制項與輸入框 --- */
         .currency-toggle-wrapper {
             display: flex; justify-content: center; align-items: center;
-            margin-bottom: 20px; padding: 10px;
-            background: #f9f9fa; border-radius: 12px;
+            margin-bottom: 25px; padding: 8px 20px;
+            background: var(--bg-offset); border-radius: 50px;
             width: fit-content; margin-left: auto; margin-right: auto;
+            border: 1px solid #e0e0e0;
         }
-        .rate-info { font-size: 0.8rem; color: var(--text-secondary); margin-right: 12px; font-family: monospace; }
+        .rate-info { font-size: 0.85rem; color: var(--text-gray); margin-right: 15px; font-family: monospace; }
         
-        /* Switch 開關 */
-        .switch { position: relative; display: inline-block; width: 46px; height: 26px; }
+        .switch { position: relative; display: inline-block; width: 50px; height: 28px; }
         .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #e5e5e5; transition: .4s; border-radius: 34px; }
-        .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        input:checked + .slider { background-color: var(--accent-blue); }
-        input:checked + .slider:before { transform: translateX(20px); }
-        .currency-label { font-size: 0.85rem; font-weight: 600; margin-left: 10px; color: var(--text-main); min-width: 35px; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #cbd5e0; transition: .4s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 22px; width: 22px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        input:checked + .slider { background-color: var(--primary-color); }
+        input:checked + .slider:before { transform: translateX(22px); }
+        .currency-label { font-size: 0.9rem; font-weight: 700; margin-left: 12px; color: var(--text-dark); }
 
         h3.section-title {
-            font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);
-            text-transform: uppercase; letter-spacing: 1.2px;
-            margin-top: 25px; margin-bottom: 15px; padding-bottom: 8px;
-            border-bottom: 1px solid #e5e5e5; display: flex; align-items: center;
-        }
-        h3.section-title::before {
-            content: ''; display: inline-block; width: 6px; height: 6px;
-            background-color: var(--accent-blue); border-radius: 50%; margin-right: 8px;
+            font-size: 0.9rem; font-weight: 700; color: var(--primary-color);
+            text-transform: uppercase; letter-spacing: 1.5px;
+            margin-top: 35px; margin-bottom: 20px; padding-left: 12px;
+            border-left: 4px solid var(--accent-color);
         }
 
-        .input-group { margin-bottom: 20px; text-align: center; }
-        label { display: block; margin-bottom: 10px; font-size: 0.9rem; font-weight: 500; color: var(--text-main); }
-        input[type="number"] {
-            width: 100%; max-width: 100%; box-sizing: border-box;
-            padding: 15px; border-radius: 12px; border: 1px solid transparent;
-            background-color: var(--input-bg); font-size: 1.4rem; font-weight: 600;
-            text-align: center; color: var(--text-main); outline: none; transition: all 0.2s ease;
+        .input-group { margin-bottom: 25px; text-align: center; }
+        label { display: block; margin-bottom: 10px; font-size: 0.95rem; font-weight: 600; color: var(--text-dark); }
+        
+        input.base-input {
+            width: 100%; padding: 16px; border-radius: 12px; border: 2px solid transparent;
+            background-color: var(--input-bg); font-size: 1.5rem; font-weight: 600;
+            text-align: center; color: var(--primary-color); outline: none; transition: 0.3s;
         }
-        input[type="number"]:focus { background-color: #fff; box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.15); border-color: var(--accent-blue); }
+        input.base-input:focus { background-color: #fff; border-color: var(--accent-color); box-shadow: 0 0 10px rgba(197, 160, 101, 0.2); }
 
-        button {
-            background-color: var(--text-main); color: white; padding: 15px;
-            border: none; border-radius: 12px; font-size: 1rem; font-weight: 500;
-            width: 100%; cursor: pointer; transition: transform 0.1s, background-color 0.2s;
-            display: block; margin: 0 auto;
+        .stepper-container {
+            display: flex; align-items: center; justify-content: center;
+            background-color: var(--input-bg); border-radius: 12px; padding: 6px;
         }
-        button:hover { background-color: #000; transform: scale(1.01); }
-        button:active { transform: scale(0.98); }
+        .stepper-btn {
+            width: 50px; height: 50px; border: none; background: transparent;
+            font-size: 1.8rem; color: var(--primary-color); cursor: pointer;
+            border-radius: 8px; display: flex; align-items: center; justify-content: center;
+            transition: 0.2s;
+        }
+        .stepper-btn:hover { background-color: rgba(26, 60, 94, 0.1); }
+        .stepper-input {
+            flex: 1; border: none; background: transparent; text-align: center;
+            font-size: 1.5rem; font-weight: 600; color: var(--primary-color); outline: none;
+            width: 80px; -moz-appearance: textfield;
+        }
+        .stepper-input::-webkit-outer-spin-button, 
+        .stepper-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
-        .result-box { margin-top: 15px; }
-        .result-row { display: flex; justify-content: space-between; align-items: baseline; padding: 12px 0; font-size: 0.95rem; border-bottom: 1px dashed #f0f0f0; }
+        .premium-input-style { background-color: #fffbf2; border: 1px solid #faecc9; }
+        .premium-input-style.manual-mode { border-color: var(--accent-color); box-shadow: 0 0 0 3px rgba(197, 160, 101, 0.1); }
+        .premium-input-style .stepper-input { color: #8a6d3b; }
+        .premium-input-style .stepper-btn { color: #8a6d3b; }
+
+        .reset-auto-btn {
+            display: none; font-size: 0.8rem; color: var(--primary-color);
+            background: none; border: 1px solid var(--primary-color);
+            padding: 6px 14px; border-radius: 20px; cursor: pointer;
+            margin: 10px auto 0 auto; transition: 0.3s;
+        }
+        .reset-auto-btn:hover { background-color: var(--primary-color); color: white; }
+
+        button.action-btn {
+            background: linear-gradient(135deg, var(--primary-color) 0%, #2c5279 100%);
+            color: white; padding: 18px; border: none; border-radius: 12px; 
+            font-size: 1.1rem; font-weight: 600; width: 100%; cursor: pointer; 
+            box-shadow: 0 8px 20px rgba(26, 60, 94, 0.25);
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 20px; letter-spacing: 1px;
+        }
+        button.action-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 25px rgba(26, 60, 94, 0.35); }
+        button.action-btn:active { transform: translateY(0); }
+
+        /* --- 結果卡片 --- */
+        .result-box { margin-top: 25px; }
+        .result-row { display: flex; justify-content: space-between; align-items: baseline; padding: 14px 0; font-size: 1rem; border-bottom: 1px solid #eee; }
         .result-row:last-child { border-bottom: none; }
-        .result-label { color: var(--text-secondary); font-weight: 400; }
-        .result-value { font-weight: 600; color: var(--text-main); font-feature-settings: "tnum"; }
-        .highlight-blue { color: var(--accent-blue); }
-
+        .result-label { color: var(--text-gray); font-weight: 500; }
+        .result-value { font-weight: 700; color: var(--text-dark); font-feature-settings: "tnum"; font-family: "SF Mono", "Roboto Mono", monospace; }
+        .highlight-blue { color: var(--primary-color); }
+        
         .highlight-total-card {
-            margin-top: 25px; padding: 25px;
-            background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%);
-            border: 1px solid rgba(0, 113, 227, 0.1); border-radius: 16px;
-            text-align: center; box-shadow: 0 4px 15px rgba(0, 113, 227, 0.05);
+            margin-top: 30px; padding: 30px;
+            background: linear-gradient(135deg, var(--primary-color) 0%, #102a43 100%);
+            color: white; border-radius: 16px; text-align: center;
+            box-shadow: 0 10px 30px rgba(26, 60, 94, 0.3);
+            position: relative; overflow: hidden;
         }
-        .highlight-total-card .result-label { display: block; margin-bottom: 5px; color: var(--accent-blue); font-size: 0.85rem; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
-        .highlight-total-card .result-value { font-size: 2rem; color: var(--text-main); letter-spacing: -1px;}
+        .highlight-total-card::before {
+            content: ""; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 60%);
+            transform: rotate(30deg);
+        }
+        .highlight-total-card .result-label { display: block; margin-bottom: 8px; color: rgba(255,255,255,0.7); font-size: 0.9rem; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; }
+        .highlight-total-card .result-value { font-size: 2.2rem; color: #fff; letter-spacing: -0.5px; font-weight: 700; }
 
-        .status-badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
-        .status-success { background-color: rgba(52, 199, 89, 0.1); color: var(--success-green); }
-        .status-error { background-color: rgba(255, 59, 48, 0.1); color: var(--error-red); }
+        .status-badge { display: inline-flex; align-items: center; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; }
+        .status-success { background-color: rgba(39, 174, 96, 0.15); color: var(--success-green); }
+        .status-error { background-color: rgba(192, 57, 43, 0.15); color: var(--alert-red); }
+
+        /* --- 表格樣式 --- */
+        .table-container {
+            margin-top: 40px; overflow-x: auto; border-radius: 12px;
+            border: 1px solid #e1e4e8; background: white;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+        }
+        table {
+            width: 100%; border-collapse: collapse; font-size: 0.85rem;
+            text-align: center; min-width: 950px; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        thead { background-color: var(--primary-color); color: white; }
+        th {
+            padding: 15px 8px; font-weight: 600; letter-spacing: 0.5px;
+            border-right: 1px solid rgba(255,255,255,0.1); white-space: nowrap; vertical-align: middle;
+        }
+        th:last-child { border-right: none; }
+        .th-small { display: block; font-size: 0.7em; opacity: 0.8; font-weight: 400; margin-top: 4px; }
+        
+        tbody tr:nth-child(even) { background-color: #f8f9fa; }
+        tbody tr:hover { background-color: #f1f4f6; }
+        td {
+            padding: 12px 8px; border-bottom: 1px solid #eee; color: var(--text-dark);
+            font-feature-settings: "tnum"; white-space: nowrap; vertical-align: middle;
+            font-family: "SF Mono", "Roboto Mono", monospace; 
+        }
+        tr:last-child td { border-bottom: none; }
+
+        /* 表格內數值顏色 */
+        .val-surrender { color: #d35400; font-weight: 600; } /* 解約金維持橘紅 */
+        .val-invest-payout { color: var(--text-gray); } 
+        .val-invest-payout.cashflow-highlight { color: var(--alert-red); font-weight: 700; }
+        
+        /* 總資產與 ROI */
+        .val-total { color: var(--primary-color); font-weight: 700; } 
+        .col-roi { color: var(--alert-red); font-weight: 800; font-size: 1.05em; } 
+
+        .cashflow-label { font-size: 0.7em; color: var(--alert-red); display: block; line-height: 1; margin-top: 2px; }
+        
+        /* 免責聲明樣式 */
+        .disclaimer-box {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #e1e4e8;
+            margin-top: 30px;
+        }
+        .disclaimer-title {
+            color: var(--alert-red);
+            font-weight: 700;
+            margin-bottom: 12px;
+            display: block;
+            font-size: 0.9rem;
+        }
+        .disclaimer-list {
+            font-size: 0.8rem;
+            color: var(--text-gray);
+            margin: 0;
+            padding-left: 20px;
+            line-height: 1.6;
+            text-align: left;
+        }
+        .disclaimer-list li { margin-bottom: 5px; }
+
     </style>
 </head>
 <body>
 
 <div id="loginOverlay">
     <div class="login-card">
-        <div class="login-title">🔒 請輸入訪問密碼</div>
-        <input type="password" id="passwordInput" class="login-input" placeholder="輸入密碼..." onkeyup="if(event.keyCode===13) checkPassword()">
-        <button class="login-btn" onclick="checkPassword()">解鎖進入</button>
+        <div class="login-title">🔒 系統存取權限</div>
+        <input type="password" id="passwordInput" class="login-input" placeholder="請輸入密碼..." onkeyup="if(event.keyCode===13) checkPassword()">
+        <button class="login-btn" onclick="checkPassword()">確認解鎖</button>
         <div id="errorMsg" class="error-msg">❌ 密碼錯誤，請重試</div>
     </div>
 </div>
@@ -161,7 +256,7 @@
 
     <header>
         <h2>配息小金庫專案</h2>
-        <div class="subtitle">專屬投資組合配置系統</div>
+        <div class="subtitle">富邦專屬資產配置系統 (視覺優化版)</div>
     </header>
 
     <div class="currency-toggle-wrapper">
@@ -174,29 +269,94 @@
     </div>
     
     <div class="input-group">
+        <label for="clientAge">輸入保戶年齡 (歲)</label>
+        <input type="number" id="clientAge" value="36" min="0" max="100" class="base-input" placeholder="例如：36">
+    </div>
+
+    <div class="input-group">
         <label id="inputLabel" for="principal">輸入總資金規模 (NT$)</label>
-        <input type="number" id="principal" value="10000000" min="0" step="10000" placeholder="例如：10000000">
+        <input type="number" id="principal" value="10000000" min="0" step="10000" class="base-input" placeholder="例如：10000000" onchange="handlePrincipalChange()">
     </div>
 
     <div class="input-group">
         <label for="payoutRate">預期年化配息率 (%)</label>
-        <input type="number" id="payoutRate" value="8" min="0" step="0.1" placeholder="例如：8">
+        <div class="stepper-container">
+            <button class="stepper-btn" onclick="adjustValue('payoutRate', -0.5)">−</button>
+            <input type="number" id="payoutRate" value="8" min="0" step="0.1" class="stepper-input" onchange="handleParamChange()">
+            <button class="stepper-btn" onclick="adjustValue('payoutRate', 0.5)">+</button>
+        </div>
+    </div>
+
+    <div class="input-group">
+        <label for="feeRate">適用手續費率 (%)</label>
+        <div class="stepper-container">
+            <button class="stepper-btn" onclick="adjustValue('feeRate', -1)">−</button>
+            <input type="number" id="feeRate" value="2" min="0" max="10" step="1" class="stepper-input" onchange="handleParamChange()">
+            <button class="stepper-btn" onclick="adjustValue('feeRate', 1)">+</button>
+        </div>
+    </div>
+
+    <div class="input-group">
+        <label for="manualPremium">分紅保單年繳保費 (系統自動試算)</label>
+        <div class="stepper-container premium-input-style" id="premiumContainer">
+            <button class="stepper-btn" onclick="adjustPremium(-10000)">−</button>
+            <input type="number" id="manualPremium" value="0" min="0" step="1000" class="stepper-input" onchange="enableManualMode()">
+            <button class="stepper-btn" onclick="adjustPremium(10000)">+</button>
+        </div>
+        <button class="reset-auto-btn" id="resetAutoBtn" onclick="restoreAutoMode()">↺ 恢復自動平衡計算</button>
+        <div style="font-size:0.75rem; color:#8a6d3b; margin-top:5px;" id="premiumHint">* 調整此金額將改變投資配置</div>
     </div>
     
-    <button onclick="calculatePlan()">更新計算結果</button>
+    <button class="action-btn" onclick="calculatePlan()">更新資產試算表</button>
 
     <div class="result-box" id="results">
+        </div>
+    
+    <div id="projectionArea" style="display:none;">
+        <h3 class="section-title">20年資產增長與備用金預估</h3>
+        <div class="table-container">
+            <table id="projectionTable">
+                <thead>
+                    <tr>
+                        <th width="8%">年度</th>
+                        <th width="8%">年齡</th>
+                        <th>分紅保單<br>解約金</th>
+                        <th>當年度<br>投資配息</th>
+                        <th>投資帳戶<br>本金結餘<span class="th-small">(假設淨值不變)</span></th>
+                        <th>投資型<br>備用金<span class="th-small">(本金50%)</span></th>
+                        <th>分紅保單<br>備用金<span class="th-small">(借款上限)</span></th>
+                        <th>總資產<br><span class="th-small">(含解約+淨現金流)</span></th>
+                        <th>總資產<br>報酬率</th>
+                    </tr>
+                </thead>
+                <tbody id="projectionBody">
+                </tbody>
+            </table>
+        </div>
+
+        <div class="disclaimer-box">
+            <span class="disclaimer-title">⚠️ 免責聲明：本計算機僅供內部教育訓練與模擬試算使用，並非正式保單條款或銷售文件。</span>
+            <ol class="disclaimer-list">
+                <li>所有試算數據（如宣告利率、投資報酬率 7% 等）均為假設值，僅供參考，不代表未來實際績效，亦不保證最低收益。</li>
+                <li>實際保單權利義務請以保險公司正式條款為準。</li>
+                <li>投資一定有風險，基金投資有賺有賠，申購前應詳閱公開說明書。</li>
+                <li>使用者應自行評估風險，本工具開發者不對任何引用本工具所做出之投資決策負責。</li>
+            </ol>
+        </div>
+
     </div>
+
 </div>
 
 <script>
     // ==========================================
     // 🔒 設定您的密碼
     const MY_ACCESS_PASSWORD = "TP927"; 
-
-    // 🖼️ 設定 Banner 圖片網址 (若無圖片，請留空或刪除網址)
-    const BANNER_IMAGE_URL = "https://i.postimg.cc/T2nftvNz/Gemini-Generated-Image-i77458i77458i774.png"; 
+    // 🖼️ Banner
+    const BANNER_IMAGE_URL = "https://i.postimg.cc/G2JSDD08/Gemini-Generated-Image-7xa57e7xa57e7xa5.png"; 
     // ==========================================
+
+    let isManualMode = false; 
 
     function checkPassword() {
         const input = document.getElementById('passwordInput').value;
@@ -205,9 +365,7 @@
         
         if (input === MY_ACCESS_PASSWORD) {
             overlay.style.opacity = '0';
-            setTimeout(() => {
-                overlay.style.display = 'none';
-            }, 300);
+            setTimeout(() => { overlay.style.display = 'none'; }, 300);
         } else {
             errorMsg.style.display = 'block';
             document.getElementById('passwordInput').value = '';
@@ -215,18 +373,69 @@
         }
     }
 
-    // 初始化 Banner
     document.addEventListener("DOMContentLoaded", function() {
         if (BANNER_IMAGE_URL && BANNER_IMAGE_URL.trim() !== "") {
             document.getElementById('bannerImg').src = BANNER_IMAGE_URL;
             document.getElementById('bannerContainer').style.display = 'block';
         }
+        autoSetFee();
+        checkAutoBalance(); 
     });
 
     const EXCHANGE_RATE = 31.32;
     let isUSD = false;
+    
+    // 美富紅運 解約金比例
+    const CASH_VALUE_RATIO = [0, 0.38, 0.52, 0.57, 0.65, 0.76, 1.01, 1.04, 1.07, 1.11, 1.14, 1.18, 1.21, 1.24, 1.27, 1.31, 1.34, 1.37, 1.41, 1.44, 1.47];
+    
+    // 保單借款上限比例
+    const LOAN_LIMIT_RATIO = [0, 0.70, 0.70, 0.70, 0.75, 0.80, 0.85];
+
+    function getLoanRatio(year) {
+        if (year >= 6) return 0.85;
+        return LOAN_LIMIT_RATIO[year] || 0.70;
+    }
+
+    function adjustValue(id, step) {
+        const input = document.getElementById(id);
+        let val = parseFloat(input.value) || 0;
+        val += step;
+        if (id === 'feeRate' && val < 0) val = 0;
+        if (id === 'payoutRate' && val < 0) val = 0;
+        
+        if (step % 1 !== 0) { input.value = val.toFixed(1); } else { input.value = Math.round(val); }
+        handleParamChange();
+    }
+
+    function adjustPremium(step) {
+        enableManualMode();
+        const input = document.getElementById('manualPremium');
+        let val = parseFloat(input.value) || 0;
+        val += step;
+        if (val < 0) val = 0;
+        input.value = Math.round(val);
+        calculatePlan();
+    }
+
+    function enableManualMode() {
+        if (!isManualMode) {
+            isManualMode = true;
+            document.getElementById('resetAutoBtn').style.display = 'block';
+            document.getElementById('premiumContainer').classList.add('manual-mode');
+            document.querySelector("label[for='manualPremium']").innerText = "分紅保單年繳保費 (手動鎖定中)";
+        }
+    }
+
+    function restoreAutoMode() {
+        isManualMode = false;
+        document.getElementById('resetAutoBtn').style.display = 'none';
+        document.getElementById('premiumContainer').classList.remove('manual-mode');
+        document.querySelector("label[for='manualPremium']").innerText = "分紅保單年繳保費 (系統自動試算)";
+        checkAutoBalance(); 
+    }
 
     function formatCurrency(num) {
+        if (isNaN(num)) return "0";
         if (isUSD) {
             return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         } else {
@@ -239,9 +448,10 @@
         const label = document.getElementById('currencyText');
         const inputLabel = document.getElementById('inputLabel');
         const inputField = document.getElementById('principal');
+        const premiumField = document.getElementById('manualPremium');
         
-        let currentVal = parseFloat(inputField.value);
-        if (isNaN(currentVal)) currentVal = 0;
+        let currentVal = parseFloat(inputField.value) || 0;
+        let currentPremium = parseFloat(premiumField.value) || 0;
 
         isUSD = toggle.checked;
 
@@ -249,120 +459,202 @@
             label.innerText = "USD";
             inputLabel.innerText = "輸入總資金規模 (USD)";
             inputField.value = (currentVal / EXCHANGE_RATE).toFixed(2);
+            premiumField.value = (currentPremium / EXCHANGE_RATE).toFixed(0);
         } else {
             label.innerText = "TWD";
             inputLabel.innerText = "輸入總資金規模 (NT$)";
             inputField.value = Math.round(currentVal * EXCHANGE_RATE);
+            premiumField.value = Math.round(currentPremium * EXCHANGE_RATE);
         }
-        calculatePlan();
+        
+        autoSetFee();
+        if(!isManualMode) { setTimeout(checkAutoBalance, 50); } else { setTimeout(calculatePlan, 50); }
     }
 
-    function getFeeRate(investmentPreFeeUSD) {
-        let investmentTWD = isUSD ? investmentPreFeeUSD * EXCHANGE_RATE : investmentPreFeeUSD;
-        if (investmentTWD >= 10000000) return 0.02;
-        else if (investmentTWD >= 5000000) return 0.03;
-        else if (investmentTWD >= 2000000) return 0.04;
-        else return 0.05;
+    function autoSetFee() {
+        const inputField = document.getElementById('principal');
+        let val = parseFloat(inputField.value) || 0;
+        let feeInput = document.getElementById('feeRate');
+        let investmentTWD = isUSD ? val * EXCHANGE_RATE : val;
+        
+        let suggestedFee = 5;
+        if (investmentTWD >= 10000000) suggestedFee = 2;
+        else if (investmentTWD >= 5000000) suggestedFee = 3;
+        else if (investmentTWD >= 2000000) suggestedFee = 4;
+        
+        feeInput.value = suggestedFee;
     }
     
-    function calculateSavingsPremium(P, PAYOUT_RATE) {
-        let X_guess = P / 2;
-        for (let i = 0; i < 10; i++) { 
-            const feeRate = getFeeRate(X_guess);
-            const S_new = (P * (1 - feeRate) * PAYOUT_RATE) / (1 + (1 - feeRate) * PAYOUT_RATE);
-            const X_new = P - S_new;
-            if (getFeeRate(X_new) === feeRate) return S_new;
-            X_guess = X_new;
-        }
-        const finalFeeRate = getFeeRate(P - X_guess);
-        return (P * (1 - finalFeeRate) * PAYOUT_RATE) / (1 + (1 - finalFeeRate) * PAYOUT_RATE);
+    function handlePrincipalChange() {
+        autoSetFee();
+        if (!isManualMode) { checkAutoBalance(); } else { calculatePlan(); }
+    }
+
+    function handleParamChange() {
+        if (!isManualMode) { checkAutoBalance(); } else { calculatePlan(); }
+    }
+
+    function checkAutoBalance() {
+        if (isManualMode) return; 
+
+        let principal = parseFloat(document.getElementById('principal').value) || 0;
+        let rateInput = parseFloat(document.getElementById('payoutRate').value) || 8;
+        let feeInput = parseFloat(document.getElementById('feeRate').value) || 2;
+        
+        const PAYOUT_RATE = rateInput / 100;
+        const FEE_RATE = feeInput / 100;
+        
+        const netRate = (1 - FEE_RATE) * PAYOUT_RATE;
+        const suggested = (principal * netRate) / (1 + netRate);
+        
+        document.getElementById('manualPremium').value = Math.round(suggested);
+        calculatePlan(); 
+    }
+
+    function generateProjectionTable(investmentBase, annualPremium, totalPrincipal, termYears, startAge, payoutRate) {
+        try {
+            const tableBody = document.getElementById('projectionBody');
+            if(!tableBody) return; 
+
+            let tableHTML = '';
+            let cashFlowAccumulated = 0; 
+
+            for (let year = 1; year <= 20; year++) {
+                let currentAge = startAge + year; 
+                
+                let accumulatedPremiums = (year <= termYears) ? annualPremium * year : annualPremium * termYears;
+                let ratio = CASH_VALUE_RATIO[year] || 1.47; 
+                let surrenderValue = accumulatedPremiums * ratio;
+
+                let investPayout = investmentBase * payoutRate;
+                let currentInvestment = investmentBase; 
+                
+                let investmentReserve = currentInvestment * 0.5;
+                let loanLimitPercent = getLoanRatio(year);
+                let policyReserve = surrenderValue * loanLimitPercent;
+
+                let investPayoutDisplay = formatCurrency(investPayout);
+                let investPayoutClass = "val-invest-payout";
+                
+                let totalAsset = 0;
+
+                if (year > termYears) {
+                    cashFlowAccumulated += investPayout;
+                    totalAsset = surrenderValue + currentInvestment + cashFlowAccumulated;
+                    
+                    investPayoutClass = "val-invest-payout cashflow-highlight";
+                    investPayoutDisplay = `${formatCurrency(investPayout)}<span class="cashflow-label">(現金流)</span>`;
+                } else {
+                    totalAsset = surrenderValue + currentInvestment;
+                }
+
+                let totalRoiRatio = (totalPrincipal > 0) ? (totalAsset / totalPrincipal) * 100 : 0;
+
+                tableHTML += `
+                    <tr>
+                        <td class="td-year">第 ${year} 年</td>
+                        <td>${currentAge} 歲</td>
+                        <td class="val-surrender">${formatCurrency(surrenderValue)}</td>
+                        <td class="${investPayoutClass}">${investPayoutDisplay}</td>
+                        <td>${formatCurrency(currentInvestment)}</td>
+                        <td>${formatCurrency(investmentReserve)}</td>
+                        <td>${formatCurrency(policyReserve)}</td>
+                        <td class="val-total">${formatCurrency(totalAsset)}</td>
+                        <td class="col-roi">${totalRoiRatio.toFixed(1)}%</td>
+                    </tr>
+                `;
+            }
+            tableBody.innerHTML = tableHTML;
+            document.getElementById('projectionArea').style.display = 'block';
+        } catch (e) { console.error(e); }
     }
 
     function calculatePlan() {
-        // 取得使用者輸入的配息率
-        let rateInput = parseFloat(document.getElementById('payoutRate').value);
-        
-        // 若輸入無效或小於等於0，則使用預設值8
-        if (isNaN(rateInput) || rateInput <= 0) {
-            rateInput = 8;
-        }
-
-        const PAYOUT_RATE = rateInput / 100; // 轉換為小數點 (例如 8 -> 0.08)
-        const TERM_YEARS = 6;
-        const principalAmount = parseFloat(document.getElementById('principal').value);
-
-        if (isNaN(principalAmount) || principalAmount <= 0) {
-            document.getElementById('results').innerHTML = '<p style="color: #ff3b30; text-align:center; margin-top:20px;">請輸入有效的金額。</p>';
-            return;
-        }
-
-        const annualSavingsPremium = calculateSavingsPremium(principalAmount, PAYOUT_RATE);
-        const investmentPreFee = principalAmount - annualSavingsPremium;
-        const applicableFeeRate = getFeeRate(investmentPreFee);
-        const totalFee = investmentPreFee * applicableFeeRate;
-        const investmentBase = investmentPreFee - totalFee;
-        const annualPayout = investmentBase * PAYOUT_RATE;
-        const totalSavingsPaid = annualSavingsPremium * TERM_YEARS;
-        const totalAssetAfterSixYears = totalSavingsPaid + investmentPreFee;
-        
-        const tolerance = isUSD ? 0.1 : 1; 
-        const isBalanced = Math.abs(annualPayout - annualSavingsPremium) < tolerance;
-        
-        const validationStatus = isBalanced ? 
-            '<span class="status-badge status-success">✓ 系統平衡</span>' : 
-            '<span class="status-badge status-error">⚠ 需要調整</span>';
-
-        const symbol = isUSD ? "USD " : "NT$ ";
-
-        const resultsHTML = `
-            <h3 class="section-title">分紅保單配置</h3>
-            <div class="result-row">
-                <span class="result-label">年繳保費</span>
-                <span class="result-value">${symbol}${formatCurrency(annualSavingsPremium)}</span>
-            </div>
-            <div class="result-row">
-                <span class="result-label">六年總投入</span>
-                <span class="result-value">${symbol}${formatCurrency(totalSavingsPaid)}</span>
-            </div>
+        try {
+            let rateInput = parseFloat(document.getElementById('payoutRate').value);
+            let feeInput = parseFloat(document.getElementById('feeRate').value);
+            let ageInput = parseInt(document.getElementById('clientAge').value);
+            let principalAmount = parseFloat(document.getElementById('principal').value);
+            let annualSavingsPremium = parseFloat(document.getElementById('manualPremium').value);
             
-            <h3 class="section-title">投資型保單配置</h3>
-            <div class="result-row">
-                <span class="result-label">投資總額</span>
-                <span class="result-value">${symbol}${formatCurrency(investmentPreFee)}</span>
-            </div>
-            <div class="result-row">
-                <span class="result-label">適用手續費率 (依台幣級距)</span>
-                <span class="result-value highlight-blue">${(applicableFeeRate * 100).toFixed(0)}%</span>
-            </div>
-            <div class="result-row">
-                <span class="result-label">扣除手續費</span>
-                <span class="result-value text-secondary" style="font-size:0.9em;">-${symbol}${formatCurrency(totalFee)}</span>
-            </div>
-            <div class="result-row" style="border-top: 1px dashed #eee; padding-top:10px; margin-top:5px;">
-                <span class="result-label">實際進場本金</span>
-                <span class="result-value highlight-blue">${symbol}${formatCurrency(investmentBase)}</span>
-            </div>
+            if (isNaN(rateInput) || rateInput <= 0) rateInput = 8;
+            if (isNaN(feeInput) || feeInput < 0) feeInput = 0;
+            if (isNaN(ageInput) || ageInput < 0) ageInput = 36;
+            if (isNaN(principalAmount) || principalAmount <= 0) return;
+            if (isNaN(annualSavingsPremium)) annualSavingsPremium = 0;
+
+            const PAYOUT_RATE = rateInput / 100;
+            const FEE_RATE = feeInput / 100;
+            const TERM_YEARS = 6;
+
+            const investmentPreFee = principalAmount - annualSavingsPremium;
             
-            <h3 class="section-title">現金流檢視</h3>
-            <div class="result-row">
-                <span class="result-label">預期年化配息 (${rateInput}%)</span>
-                <span class="result-value" style="color:var(--success-green);">${symbol}${formatCurrency(annualPayout)}</span>
-            </div>
-            <div class="result-row">
-                <span class="result-label">配息覆蓋保費</span>
-                <span class="result-value">${validationStatus}</span>
-            </div>
+            if (investmentPreFee < 0) {
+                document.getElementById('results').innerHTML = '<p style="color:red;text-align:center;">保費設定過高，超過總資金！</p>';
+                return;
+            }
+
+            const totalFee = investmentPreFee * FEE_RATE;
+            const investmentBase = investmentPreFee - totalFee; 
+            const annualPayout = investmentBase * PAYOUT_RATE; 
             
-            <div class="highlight-total-card">
-                <span class="result-label">六年後總資產預估</span>
-                <span class="result-value">${symbol}${formatCurrency(totalAssetAfterSixYears)}</span>
-            </div>
-        `;
-        
-        document.getElementById('results').innerHTML = resultsHTML;
+            const totalSavingsPaid = annualSavingsPremium * TERM_YEARS;
+            const surrenderValueY6 = (annualSavingsPremium * TERM_YEARS) * CASH_VALUE_RATIO[6];
+            const totalAssetAfterSixYears = surrenderValueY6 + investmentBase; 
+            
+            const balance = annualPayout - annualSavingsPremium;
+            const tolerance = isUSD ? 1 : 10; 
+            let validationStatus = '';
+            
+            if (balance >= -tolerance) {
+                validationStatus = `<span class="status-badge status-success">充足 (餘 ${formatCurrency(balance)})</span>`;
+            } else {
+                validationStatus = `<span class="status-badge status-error">不足 (缺 ${formatCurrency(Math.abs(balance))})</span>`;
+            }
+
+            const symbol = isUSD ? "USD " : "NT$ ";
+
+            const resultsHTML = `
+                <h3 class="section-title">分紅保單配置 ${isManualMode ? '(手動)' : '(自動)'}</h3>
+                <div class="result-row">
+                    <span class="result-label">年繳保費</span>
+                    <span class="result-value" style="color:var(--accent-color); font-size:1.1em;">${symbol}${formatCurrency(annualSavingsPremium)}</span>
+                </div>
+                <div class="result-row">
+                    <span class="result-label">六年總投入保費</span>
+                    <span class="result-value">${symbol}${formatCurrency(totalSavingsPaid)}</span>
+                </div>
+                
+                <h3 class="section-title">投資型保單配置</h3>
+                <div class="result-row">
+                    <span class="result-label">剩餘資金轉入投資</span>
+                    <span class="result-value">${symbol}${formatCurrency(investmentPreFee)}</span>
+                </div>
+                <div class="result-row">
+                    <span class="result-label">實際進場本金 (扣除手續費)</span>
+                    <span class="result-value highlight-blue">${symbol}${formatCurrency(investmentBase)}</span>
+                </div>
+                
+                <h3 class="section-title">現金流檢視</h3>
+                <div class="result-row">
+                    <span class="result-label">預期年化配息 (${rateInput}%)</span>
+                    <span class="result-value" style="color:var(--success-green);">${symbol}${formatCurrency(annualPayout)}</span>
+                </div>
+                <div class="result-row">
+                    <span class="result-label">配息覆蓋保費</span>
+                    <span class="result-value">${validationStatus}</span>
+                </div>
+                
+                <div class="highlight-total-card">
+                    <span class="result-label">六年後總資產預估 (不含配息)</span>
+                    <span class="result-value">${symbol}${formatCurrency(totalAssetAfterSixYears)}</span>
+                </div>
+            `;
+            
+            document.getElementById('results').innerHTML = resultsHTML;
+            generateProjectionTable(investmentBase, annualSavingsPremium, principalAmount, TERM_YEARS, ageInput, PAYOUT_RATE);
+        } catch(e) { console.error("計算錯誤:", e); }
     }
-
-    document.addEventListener('DOMContentLoaded', calculatePlan);
 </script>
 
 </body>
