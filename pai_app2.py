@@ -4,7 +4,7 @@ import numpy as np
 
 # --- 1. 頁面基礎設定 ---
 st.set_page_config(
-    page_title="PAI 策略全能計算機",
+    page_title="PAI 策略全能計算機 (修正版)",
     page_icon="📊",
     layout="wide"
 )
@@ -12,7 +12,7 @@ st.set_page_config(
 # --- 1.5 密碼驗證模組 ---
 def check_password():
     """Returns `True` if the user had a correct password."""
-    ACTUAL_PASSWORD = "TP927" # <--- 密碼設定
+    ACTUAL_PASSWORD = "TP927" 
 
     def password_entered():
         if st.session_state["password"] == ACTUAL_PASSWORD:
@@ -66,7 +66,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. 核心資料與函式 (邏輯修正版) ---
+# --- 3. 核心資料與函式 (含折扣與紅利) ---
 
 @st.cache_data
 def load_policy_data(uploaded_file):
@@ -96,7 +96,7 @@ def load_policy_data(uploaded_file):
         try:
             sex = int(row[5]) # 1=男, 2=女
             age = int(row[7])
-            rate = float(row[10]) # 單位保費 (通常是每萬元保額的費率)
+            rate = float(row[10])
             key = f"{sex}_{age}"
             data["premium_rate"][key] = rate
         except:
@@ -142,36 +142,94 @@ def load_policy_data(uploaded_file):
             
     return data
 
-def get_policy_values_by_face_amount(age, gender_code, face_amount, data_dict):
+def calculate_discount_rate(face_amount_wan):
     """
-    根據保額 (Face Amount) 計算保費與價值
+    計算高保額折扣率
+    規則假設：
+    < 100萬: 0%
+    100萬 ~ 200萬(不含): 1.0%
+    >= 200萬: 1.5%
+    """
+    if face_amount_wan >= 200:
+        return 0.015
+    elif face_amount_wan >= 100:
+        return 0.01
+    else:
+        return 0.0
+
+def calculate_dividends(guaranteed_cv_list, annual_premium_discounted, declared_rate=0.0175, assumed_rate=0.01):
+    """
+    計算累積年度紅利 (Accumulated Annual Dividends)
+    公式近似：(前一年末保價 + 當年度實繳保費) * (宣告 - 預定)
+    """
+    accumulated_dividends = []
+    current_acc_div = 0
+    
+    # 假設繳費年期 20 年 (影響分紅本金)
+    payment_years = 20 
+    
+    for t in range(len(guaranteed_cv_list)):
+        # 前一年末保價 (第1年是0)
+        prev_pv = guaranteed_cv_list[t-1] if t > 0 else 0
+        
+        # 當年度實繳保費 (繳費期內才算)
+        curr_prem = annual_premium_discounted if t < payment_years else 0
+        
+        # 利差分紅 (Interest Spread Dividend)
+        # 這裡用 (期初準備金 + 保費) * 利差 來估算
+        # 期初準備金近似於 前一年末保價 + 累積紅利
+        base_for_interest = prev_pv + current_acc_div + curr_prem
+        
+        dividend = base_for_interest * (declared_rate - assumed_rate)
+        
+        if dividend < 0: dividend = 0
+        
+        # 累積紅利滾存 (本金+新紅利)
+        # 注意：通常累積紅利本身也會以宣告利率滾存
+        current_acc_div = current_acc_div * (1 + declared_rate) + dividend
+        
+        accumulated_dividends.append(current_acc_div)
+        
+    return accumulated_dividends
+
+def get_policy_values_with_dividends(age, gender_code, face_amount, data_dict, declared_rate, assumed_rate):
+    """
+    整合計算：保費(含折扣) + 保證值 + 紅利
     """
     if data_dict is None:
-        return 0, [], []
+        return 0, 0, 0, [], []
         
     key = f"{gender_code}_{age}"
     
-    # 1. 取得每萬元費率
-    rate_per_10k = data_dict["premium_rate"].get(key)
+    # 1. 取得基本費率
+    rate_per_10k = data_dict["premium_rate"].get(key, 0)
+    if rate_per_10k == 0: return 0, 0, 0, [], []
     
-    if not rate_per_10k:
-        return 0, [], []
-        
-    # 2. 計算單位數 (以萬元為單位)
-    # 假設 PDATA 表格基準是 1 萬元保額
-    units = face_amount / 10000.0
+    # 2. 計算原始保費
+    face_amount_wan = face_amount / 10000
+    units = face_amount_wan # 單位數
+    original_premium = rate_per_10k * units
     
-    # 3. 計算總保費
-    total_annual_premium = rate_per_10k * units
+    # 3. 計算折扣
+    discount_rate = calculate_discount_rate(face_amount_wan)
+    discounted_premium = original_premium * (1 - discount_rate)
     
-    # 4. 計算歷年數值
+    # 4. 取得查表保證值
     raw_cv = data_dict["cash_value"].get(key, [])
     raw_die = data_dict["death_benefit"].get(key, [])
     
-    final_cv = [val * units for val in raw_cv]
-    final_die = [val * units for val in raw_die]
+    guaranteed_cv = [val * units for val in raw_cv]
+    guaranteed_die = [val * units for val in raw_die]
     
-    return total_annual_premium, final_cv, final_die
+    # 5. 計算紅利 (使用折扣後的實繳保費來算貢獻度嗎？通常是用表定保費算準備金，但利差是用資產份額。
+    # 為求保守與精確，我們用 "保證解約金" 代表 "資產份額" 的底，加上 "折扣後保費" 的利差)
+    acc_div_list = calculate_dividends(guaranteed_cv, discounted_premium, declared_rate, assumed_rate)
+    
+    # 6. 合併總值
+    total_cv = [g + d for g, d in zip(guaranteed_cv, acc_div_list)]
+    total_die = [g + d for g, d in zip(guaranteed_die, acc_div_list)]
+    
+    return original_premium, discounted_premium, discount_rate, total_cv, total_die
 
 def get_loan_limit_rate(year):
     if year >= 12: return 0.90
@@ -206,9 +264,14 @@ with st.sidebar:
     gender = st.radio("性別", ["男性", "女性"], horizontal=True)
     gender_code = 1 if gender == "男性" else 2
     
-    # [修改點] 輸入改為保額 (萬元)
-    face_amount_wan = st.number_input("🛡️ 投保保額 (萬元)", value=100, step=10, help="請輸入您想要的壽險保障額度，單位為萬元")
+    face_amount_wan = st.number_input("🛡️ 投保保額 (萬元)", value=100, step=10, help="輸入 200 萬以上自動適用 1.5% 折扣")
     face_amount = face_amount_wan * 10000
+    
+    st.divider()
+    
+    st.markdown("### 3. 紅利參數")
+    declared_rate = st.number_input("📈 宣告利率 (%)", value=1.75, step=0.05) / 100
+    assumed_rate = 0.01 # 預定利率固定 1%
     
     st.divider()
     
@@ -216,7 +279,7 @@ with st.sidebar:
     st.info("💡 說明：\n\n**以息養險**：配息優先折抵保費，多餘領現。\n\n**階梯槓桿**：配息全數再投入，追求資產最大化。\n\n**⚡ 借款規則**：\n1. 可貸額度需滿 30 萬。\n2. 之後每滿 3 年且額度足夠才借。")
 
 # --- 5. 主畫面 ---
-st.title("📊 PAI 策略全能計算機")
+st.title("📊 PAI 策略全能計算機 (修正版)")
 
 IMG_OFFSET = "https://i.postimg.cc/9Mwkq4c1/Gemini-Generated-Image-57o51457o51457o5.png"
 IMG_COMPOUND = "https://i.postimg.cc/SxKDMXr6/Gemini-Generated-Image-p41a4fp41a4fp41a.png"
@@ -236,26 +299,29 @@ if policy_data is None:
     st.warning("👈 請先在左側上傳 PDATA.csv 檔案才能開始計算！")
     st.stop()
 
-# [修改點] 呼叫新的函式，傳入保額，回傳計算好的年繳保費
-annual_premium, cv_list, die_list = get_policy_values_by_face_amount(start_age, gender_code, face_amount, policy_data)
+# [修正點] 呼叫含紅利與折扣的計算函式
+orig_prem, annual_premium, disc_rate, cv_list, die_list = get_policy_values_with_dividends(
+    start_age, gender_code, face_amount, policy_data, declared_rate, assumed_rate
+)
 
 if not cv_list:
     st.error(f"❌ 找不到 {start_age} 歲 {gender} 的費率資料，請確認 CSV 內容。")
     st.stop()
 
-# 顯示保費資訊區塊
+# 顯示保費與折扣資訊區塊
 st.markdown(f"""
 <div style="padding: 15px; background-color: #f6ffed; border: 1px solid #b7eb8f; border-radius: 5px; margin-bottom: 20px;">
-    <h3 style="margin:0; color: #389e0d;">💰 保費試算結果</h3>
-    <div style="display: flex; gap: 30px; margin-top: 10px; font-size: 18px;">
+    <h3 style="margin:0; color: #389e0d;">💰 保費與折扣試算</h3>
+    <div style="display: flex; flex-wrap: wrap; gap: 20px; margin-top: 10px; font-size: 16px;">
         <div><b>投保保額：</b> {face_amount_wan} 萬元</div>
-        <div><b>年繳保費：</b> <span style="color: #cf1322;">${annual_premium:,.0f}</span></div>
-        <div><b>月繳預估：</b> ${annual_premium/12:,.0f} (參考)</div>
+        <div><b>原始保費：</b> ${orig_prem:,.0f}</div>
+        <div><b>適用折扣：</b> <span style="color: #d46b08; font-weight:bold;">{disc_rate*100}%</span></div>
+        <div><b>實繳年繳：</b> <span style="color: #cf1322; font-weight:bold; font-size: 18px;">${annual_premium:,.0f}</span></div>
     </div>
 </div>
 """, unsafe_allow_html=True)
 
-annual_deposit = annual_premium # 將計算出的保費設為每年的存入金額
+annual_deposit = annual_premium
 deposit_years = 20
 fee_rate = 0.05
 MIN_LOAN_THRESHOLD = 300000  
@@ -333,11 +399,11 @@ for t in range(max_years):
         row_display["②配息抵扣"] = format_money(net_income)
         row_display["③實繳金額"] = format_money(display_val, is_receive_column=True)
         row_display["④累積實繳"] = format_money(accum_real_cost)
-        row_display["⑤PAI解約金"] = format_money(cv)
+        row_display["⑤PAI解約金(含紅利)"] = format_money(cv)
         row_display["⑥保單借款"] = loan_display_str 
         row_display["⑦基金本金"] = format_money(current_fund)
         row_display["⑧總淨資產"] = format_money(total_net_asset)
-        row_display["⑨身故金"] = format_money(total_death_benefit)
+        row_display["⑨身故金(含紅利)"] = format_money(total_death_benefit)
 
         row_raw = {"loan_year": loan_tag == "⚡", "real_pay_val": display_val, "net_asset": total_net_asset}
 
@@ -352,13 +418,13 @@ for t in range(max_years):
         row_display["年齡"] = f"{current_age} {loan_tag}"
         row_display["①當年存入"] = format_money(actual_deposit)
         row_display["②累積本金"] = format_money(acc_deposit)
-        row_display["③PAI解約金"] = format_money(cv)
+        row_display["③PAI解約金(含紅利)"] = format_money(cv)
         row_display["④保單借款"] = loan_display_str 
         row_display["⑤基金本金"] = format_money(current_fund)
         row_display["⑥年度淨配息"] = format_money(net_income)
         row_display["⑦累積配息(複利)"] = format_money(accum_net_wealth)
         row_display["⑧總淨資產"] = format_money(total_net_asset)
-        row_display["⑨身故金"] = format_money(total_death_benefit)
+        row_display["⑨身故金(含紅利)"] = format_money(total_death_benefit)
 
         row_raw = {"loan_year": loan_tag == "⚡", "net_asset": total_net_asset}
 
@@ -382,7 +448,7 @@ def style_dataframe(df_input, raw_data):
             df_style.iloc[i, :] = 'background-color: #fffbe6;'
         
         df_style.iloc[i, df_input.columns.get_loc("⑧總淨資產")] += 'background-color: #e6f7ff; color: #096dd9; font-weight: bold;'
-        df_style.iloc[i, df_input.columns.get_loc("⑨身故金")] += 'background-color: #fff7e6; color: #d46b08; font-weight: bold;'
+        df_style.iloc[i, df_input.columns.get_loc(f"⑨身故金(含紅利)")] += 'background-color: #fff7e6; color: #d46b08; font-weight: bold;'
         
         if current_mode == "offset":
             val = raw["real_pay_val"]
@@ -414,7 +480,7 @@ if 'verify_snapshot' in locals():
         html_content = f"""
         <div class="verify-box">
             <div class="verify-title">🔍 65 歲資產結算驗證</div>
-            <div class="verify-row"><span>[+] PAI 保單現金價值</span> <span>{v_cv}</span></div>
+            <div class="verify-row"><span>[+] PAI 保單現金價值(含紅利)</span> <span>{v_cv}</span></div>
             <div class="verify-row"><span>[+] 基金本金</span> <span>{v_fund}</span></div>
             <div class="verify-row" style="color: #c41d7f;"><span>[+] 累積已領回現金 (Cash Out)</span> <span>{v_cash}</span></div>
             <div class="verify-row" style="color: #cf1322;"><span>[-] 扣除保單借款</span> <span>{v_loan}</span></div>
@@ -428,7 +494,7 @@ if 'verify_snapshot' in locals():
         html_content = f"""
         <div class="verify-box">
             <div class="verify-title">🔍 65 歲資產結算驗證</div>
-            <div class="verify-row"><span>[+] PAI 保單現金價值</span> <span>{v_cv}</span></div>
+            <div class="verify-row"><span>[+] PAI 保單現金價值(含紅利)</span> <span>{v_cv}</span></div>
             <div class="verify-row"><span>[+] 基金本金</span> <span>{v_fund}</span></div>
             <div class="verify-row" style="color: #722ed1;"><span>[+] 累積配息滾存 (複利)</span> <span>{v_accum}</span></div>
             <div class="verify-row" style="color: #cf1322;"><span>[-] 扣除保單借款</span> <span>{v_loan}</span></div>
