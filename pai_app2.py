@@ -66,7 +66,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. 核心資料與函式 (全新改寫) ---
+# --- 3. 核心資料與函式 (邏輯修正版) ---
 
 @st.cache_data
 def load_policy_data(uploaded_file):
@@ -76,18 +76,15 @@ def load_policy_data(uploaded_file):
     if uploaded_file is None:
         return None
 
-    # 讀取 CSV，header=None 因為格式混亂
     df = pd.read_csv(uploaded_file, header=None)
     
     data = {
-        "premium_rate": {},  # { "gender_age": rate }
-        "death_benefit": {}, # { "gender_age": [year1, year2...] }
-        "cash_value": {}     # { "gender_age": [year1, year2...] }
+        "premium_rate": {},  # { "gender_age": rate_per_10k }
+        "death_benefit": {}, # { "gender_age": [year1, year2...] per 10k SA }
+        "cash_value": {}     # { "gender_age": [year1, year2...] per 10k SA }
     }
     
     # --- 1. 解析保費 (Premium) ---
-    # 假設保費在最上方，直到 'DIE' 出現
-    # 根據您的檔案結構：性別=col 5, 年齡=col 7, 保費=col 10
     try:
         die_start_indices = df[df[129] == 'DIE'].index
         die_start_idx = die_start_indices[0] if not die_start_indices.empty else 444
@@ -99,17 +96,15 @@ def load_policy_data(uploaded_file):
         try:
             sex = int(row[5]) # 1=男, 2=女
             age = int(row[7])
-            rate = float(row[10]) # 單位保費
+            rate = float(row[10]) # 單位保費 (通常是每萬元保額的費率)
             key = f"{sex}_{age}"
             data["premium_rate"][key] = rate
         except:
             continue
 
     # --- 2. 解析身故金 (DIE) ---
-    # 從 DIE 標籤後 2 行開始讀數據
-    # 格式：性別=col 131, 年齡=col 132, 數值從 col 134 開始
     try:
-        pv_start_indices = df[df[129] == 'PV0'].index # 找下一個區塊
+        pv_start_indices = df[df[129] == 'PV0'].index 
         if pv_start_indices.empty:
             pv_start_indices = df[df[129] == 'PV'].index
         pv_start_idx = pv_start_indices[0] if not pv_start_indices.empty else 867
@@ -121,7 +116,6 @@ def load_policy_data(uploaded_file):
         try:
             sex = int(row[131])
             age = int(row[132])
-            # 取出歷年數值，去除逗號轉 float
             values = row[134:].dropna().astype(str).str.replace(',', '').astype(float).tolist()
             key = f"{sex}_{age}"
             data["death_benefit"][key] = values
@@ -129,10 +123,8 @@ def load_policy_data(uploaded_file):
             continue
 
     # --- 3. 解析解約金 (PV) ---
-    # 找 PV 標籤 (通常在下方)
     try:
         real_pv_indices = df[df[129] == 'PV'].index
-        # 這裡要小心，有時候會有 PV0 和 PV，我們要找年度末保價金通常是 PV
         real_pv_start = real_pv_indices[0] if not real_pv_indices.empty else 1737
     except:
         real_pv_start = 1737
@@ -150,38 +142,36 @@ def load_policy_data(uploaded_file):
             
     return data
 
-def get_policy_values(age, gender_code, annual_premium, data_dict):
+def get_policy_values_by_face_amount(age, gender_code, face_amount, data_dict):
     """
-    根據年齡、性別、保費，回傳該保單的歷年解約金與身故金陣列
-    gender_code: 1=男, 2=女
+    根據保額 (Face Amount) 計算保費與價值
     """
     if data_dict is None:
-        return [], []
+        return 0, [], []
         
     key = f"{gender_code}_{age}"
     
-    # 1. 取得費率 (每單位保額的保費)
-    rate = data_dict["premium_rate"].get(key)
+    # 1. 取得每萬元費率
+    rate_per_10k = data_dict["premium_rate"].get(key)
     
-    if not rate or rate == 0:
-        return [], [] # 查無資料
+    if not rate_per_10k:
+        return 0, [], []
         
-    # 2. 反推投保單位數 (Multiplier)
-    # 公式：總保費 = (投保單位 / 單位基準) * 費率
-    # 所以：投保單位 / 單位基準 = 總保費 / 費率
-    # 而表上的解約金也是每單位的數值，所以直接乘上這個倍數即可
-    # 假設表定費率是每萬元保額，或者是每百元，這裡直接用比例法最準：
-    multiplier = annual_premium / rate
+    # 2. 計算單位數 (以萬元為單位)
+    # 假設 PDATA 表格基準是 1 萬元保額
+    units = face_amount / 10000.0
     
-    # 3. 計算歷年數值
+    # 3. 計算總保費
+    total_annual_premium = rate_per_10k * units
+    
+    # 4. 計算歷年數值
     raw_cv = data_dict["cash_value"].get(key, [])
     raw_die = data_dict["death_benefit"].get(key, [])
     
-    # 乘上倍數
-    final_cv = [val * multiplier for val in raw_cv]
-    final_die = [val * multiplier for val in raw_die]
+    final_cv = [val * units for val in raw_cv]
+    final_die = [val * units for val in raw_die]
     
-    return final_cv, final_die
+    return total_annual_premium, final_cv, final_die
 
 def get_loan_limit_rate(year):
     if year >= 12: return 0.90
@@ -202,7 +192,6 @@ def format_money(val, is_receive_column=False):
 with st.sidebar:
     st.header("⚙️ 參數設定")
     
-    # 檔案上傳區
     st.markdown("### 1. 資料庫載入")
     uploaded_file = st.file_uploader("請上傳 PDATA.csv", type=['csv'])
     if uploaded_file:
@@ -212,13 +201,15 @@ with st.sidebar:
         
     st.divider()
     
-    # 輸入參數
     st.markdown("### 2. 投保條件")
     start_age = st.number_input("🧑‍💼 投保年齡", value=25, min_value=0, max_value=80)
     gender = st.radio("性別", ["男性", "女性"], horizontal=True)
     gender_code = 1 if gender == "男性" else 2
     
-    monthly_deposit = st.number_input("💵 月存金額", value=10000, step=1000)
+    # [修改點] 輸入改為保額 (萬元)
+    face_amount_wan = st.number_input("🛡️ 投保保額 (萬元)", value=100, step=10, help="請輸入您想要的壽險保障額度，單位為萬元")
+    face_amount = face_amount_wan * 10000
+    
     st.divider()
     
     mode = st.radio("🔄 選擇策略模式", ["🛡️ 以息養險 (折抵保費)", "🚀 階梯槓桿 (複利滾存)"])
@@ -239,25 +230,36 @@ else:
 
 # --- 6. 計算邏輯 ---
 
-# 載入資料
 policy_data = load_policy_data(uploaded_file)
 
 if policy_data is None:
     st.warning("👈 請先在左側上傳 PDATA.csv 檔案才能開始計算！")
     st.stop()
 
-annual_deposit = monthly_deposit * 12
-deposit_years = 20
-fee_rate = 0.05
-MIN_LOAN_THRESHOLD = 300000  # 最低借款門檻
-LOAN_INTERVAL_YEARS = 3      # 借款間隔年數
-
-# 取得該年齡對應的解約金與身故金表
-cv_list, die_list = get_policy_values(start_age, gender_code, annual_deposit, policy_data)
+# [修改點] 呼叫新的函式，傳入保額，回傳計算好的年繳保費
+annual_premium, cv_list, die_list = get_policy_values_by_face_amount(start_age, gender_code, face_amount, policy_data)
 
 if not cv_list:
     st.error(f"❌ 找不到 {start_age} 歲 {gender} 的費率資料，請確認 CSV 內容。")
     st.stop()
+
+# 顯示保費資訊區塊
+st.markdown(f"""
+<div style="padding: 15px; background-color: #f6ffed; border: 1px solid #b7eb8f; border-radius: 5px; margin-bottom: 20px;">
+    <h3 style="margin:0; color: #389e0d;">💰 保費試算結果</h3>
+    <div style="display: flex; gap: 30px; margin-top: 10px; font-size: 18px;">
+        <div><b>投保保額：</b> {face_amount_wan} 萬元</div>
+        <div><b>年繳保費：</b> <span style="color: #cf1322;">${annual_premium:,.0f}</span></div>
+        <div><b>月繳預估：</b> ${annual_premium/12:,.0f} (參考)</div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+annual_deposit = annual_premium # 將計算出的保費設為每年的存入金額
+deposit_years = 20
+fee_rate = 0.05
+MIN_LOAN_THRESHOLD = 300000  
+LOAN_INTERVAL_YEARS = 3      
 
 data_rows = []
 raw_data_rows = [] 
@@ -274,32 +276,26 @@ if current_mode == "offset":
     with col_toggle:
         is_monthly_pay = st.toggle("切換為「月繳」顯示", value=False)
 
-# 迴圈計算 (計算到 100 歲或資料結束)
 max_years = min(len(cv_list), 100 - start_age)
 
 for t in range(max_years):
     policy_year = t + 1
     current_age = start_age + policy_year
     
-    # 從查表結果取得當年度數值
     cv = cv_list[t]
     death_benefit_base = die_list[t]
     
     limit_rate = get_loan_limit_rate(policy_year)
       
-    # --- 新版借款邏輯 ---
+    # --- 借款邏輯 ---
     loan_tag = ""
-    is_borrowing_year = False # 標記今年是否有借款
+    is_borrowing_year = False 
 
-    # 只有在 65 歲以前才執行借款策略
     if current_age <= 65:
         max_loan = cv * limit_rate
         new_borrow = max_loan - current_loan
         
-        # 條件 1: 可借金額大於 30 萬
         is_amount_ok = new_borrow >= MIN_LOAN_THRESHOLD
-        
-        # 條件 2: 從未借過款 OR 距離上次借款已滿 3 年
         is_time_ok = (last_borrow_year == 0) or ((policy_year - last_borrow_year) >= LOAN_INTERVAL_YEARS)
         
         if is_amount_ok and is_time_ok:
@@ -316,7 +312,6 @@ for t in range(max_years):
     row_display = {}
     row_raw = {} 
 
-    # 處理借款顯示字串：如果有借款，加上成數
     loan_display_str = format_money(-current_loan)
     if is_borrowing_year:
         loan_display_str += f" ({int(limit_rate*100)}%)"
@@ -331,7 +326,6 @@ for t in range(max_years):
         total_net_asset = cv + current_fund + accum_cash_out - current_loan
         display_val = actual_pay_yearly / 12 if is_monthly_pay else actual_pay_yearly
         
-        # 以息養險模式下的總身故金：保單身故 + 基金本金 - 借款
         total_death_benefit = death_benefit_base + current_fund - current_loan
         
         row_display["年齡"] = f"{current_age} {loan_tag}"
@@ -343,7 +337,7 @@ for t in range(max_years):
         row_display["⑥保單借款"] = loan_display_str 
         row_display["⑦基金本金"] = format_money(current_fund)
         row_display["⑧總淨資產"] = format_money(total_net_asset)
-        row_display["⑨身故金"] = format_money(total_death_benefit) # 新增
+        row_display["⑨身故金"] = format_money(total_death_benefit)
 
         row_raw = {"loan_year": loan_tag == "⚡", "real_pay_val": display_val, "net_asset": total_net_asset}
 
@@ -353,7 +347,6 @@ for t in range(max_years):
         accum_net_wealth = (accum_net_wealth * 1.07) + net_income
         total_net_asset = cv + current_fund + accum_net_wealth - current_loan
 
-        # 階梯槓桿模式下的總身故金：保單身故 + 基金本金 + 累積配息 - 借款
         total_death_benefit = death_benefit_base + current_fund + accum_net_wealth - current_loan
         
         row_display["年齡"] = f"{current_age} {loan_tag}"
@@ -365,7 +358,7 @@ for t in range(max_years):
         row_display["⑥年度淨配息"] = format_money(net_income)
         row_display["⑦累積配息(複利)"] = format_money(accum_net_wealth)
         row_display["⑧總淨資產"] = format_money(total_net_asset)
-        row_display["⑨身故金"] = format_money(total_death_benefit) # 新增
+        row_display["⑨身故金"] = format_money(total_death_benefit)
 
         row_raw = {"loan_year": loan_tag == "⚡", "net_asset": total_net_asset}
 
@@ -388,10 +381,7 @@ def style_dataframe(df_input, raw_data):
         if raw["loan_year"]:
             df_style.iloc[i, :] = 'background-color: #fffbe6;'
         
-        # 總淨資產樣式
         df_style.iloc[i, df_input.columns.get_loc("⑧總淨資產")] += 'background-color: #e6f7ff; color: #096dd9; font-weight: bold;'
-        
-        # 身故金樣式：暖金背景，深橘金文字
         df_style.iloc[i, df_input.columns.get_loc("⑨身故金")] += 'background-color: #fff7e6; color: #d46b08; font-weight: bold;'
         
         if current_mode == "offset":
@@ -431,7 +421,6 @@ if 'verify_snapshot' in locals():
             <div class="verify-total">
                 <span>[=] 總淨資產 (Net Worth)</span> <span>{v_total}</span>
             </div>
-            <div class="verify-note">💡 說明：此模式配息優先抵扣保費，多餘的現金領回放口袋，適合重視現金流者。</div>
         </div>
         """
     else:
@@ -446,7 +435,6 @@ if 'verify_snapshot' in locals():
             <div class="verify-total">
                 <span>[=] 總淨資產 (Net Worth)</span> <span>{v_total}</span>
             </div>
-            <div class="verify-note">💡 說明：此模式假設配息全部再投入 (7%複利)，適合追求資產最大化者。</div>
         </div>
         """
     st.markdown(html_content, unsafe_allow_html=True)
