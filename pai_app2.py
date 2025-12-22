@@ -26,11 +26,12 @@ IAT2_BASE_PREMIUM = 120918
 IAT2_CV_DATA = [0, 57241, 161215, 280011, 414148, 563983, 722004, 745788, 762729, 780050, 797711, 815762, 834207, 853051, 872256, 892170, 912497, 933250, 954474, 976139, 998284, 1020880, 1043933, 1067496, 1091523, 1116366, 1141780, 1167738, 1194193, 1221201, 1248731, 1276880, 1305516, 1334739, 1364433, 1395712, 1427683, 1460369, 1493739, 1527863, 1562718, 1598291, 1634634, 1671738, 1709575, 1748178, 1787558, 1827752, 1868643, 1910310, 1952764, 1995964, 2039829, 2084438, 2129682, 2175900, 2222877, 2270575, 2319052, 2368279, 2418279, 2468979, 2520481, 2572804, 2625837, 2679680, 2734352, 2789925, 2846357, 2903802, 2962153, 3021701, 3082687, 3146580, 3200603]
 IAT2_DEATH_DATA = [0, 126468, 321248, 525515, 734419, 829592, 1020884, 1042505, 1064500, 1087000, 1109882, 1133237, 1157070, 1181428, 1206147, 1061997, 1085248, 1108966, 1133198, 1157911, 1183148, 1208876, 1235103, 1261924, 1289210, 1216901, 1244068, 1271740, 1299990, 1328795, 1358120, 1388107, 1418622, 1449725, 1481299, 1419520, 1451866, 1484970, 1518800, 1553341, 1588614, 1624646, 1661449, 1699012, 1737309, 1776371, 1816211, 1856864, 1898257, 1940424, 1983338, 2027039, 2071405, 2116516, 2162260, 2192816, 2239250, 2286321, 2334047, 2382480, 2431561, 2481342, 2531842, 2583120, 2635109, 2687867, 2741411, 2795815, 2850993, 2907018, 2963907, 3021743, 3082687, 3146580, 3200603]
 
+# 根據附件圖表修正借款成數
 def get_loan_limit_rate(year):
-    if year >= 4: return 0.90 #
-    if year == 3: return 0.85 #
-    if year == 2: return 0.80 #
-    if year == 1: return 0.75 #
+    if year >= 4: return 0.90
+    if year == 3: return 0.85
+    if year == 2: return 0.80
+    if year == 1: return 0.75
     return 0
 
 def format_money(val, is_receive_column=False):
@@ -45,17 +46,19 @@ with st.sidebar:
     start_age = st.number_input("🧑‍💼 投保年齡", value=37)
     monthly_deposit = st.number_input("💵 預算月存金額", value=10076)
     st.divider()
-    # ✨ 核心功能：切換月繳顯示
+    # 月繳切換功能
     is_monthly_view = st.toggle("📅 切換為「月繳」數值顯示", value=False)
     loan_threshold = st.slider("⚡ 最低增貸門檻", 50000, 500000, 100000, 50000)
     mode = st.radio("🔄 策略模式", ["🛡️ 以息養險 (折抵保費)", "🚀 階梯槓桿 (複利滾存)"])
 
-# --- 4. 計算邏輯 ---
-st.title("📊 IAT2 策略全能計算機 (月繳切換版)")
+# --- 4. 核心計算邏輯 ---
+st.title("📊 IAT2 策略全能計算機 (修正版)")
 
 annual_pay = monthly_deposit * 12
 data_rows, highlights = [], []
-current_loan, current_fund, accum_cash_out, accum_real_cost, last_borrow_year = 0, 0, 0, 0, 0, 0
+
+# --- 修正處：確保 6 個變數對應 6 個初始值 0 ---
+current_loan, current_fund, accum_cash_out, accum_net_wealth, accum_real_cost, last_borrow_year = 0, 0, 0, 0, 0, 0
 
 for age in range(start_age + 1, start_age + 51):
     policy_year = age - start_age
@@ -66,9 +69,10 @@ for age in range(start_age + 1, start_age + 51):
     if age <= 75: 
         max_available_loan = cv * limit_rate
         potential_new_loan = max_available_loan - current_loan
+        # 每三年檢查一次且需滿額度
         if potential_new_loan >= loan_threshold and (last_borrow_year == 0 or (policy_year - last_borrow_year) >= 3):
             current_loan = max_available_loan
-            current_fund += potential_new_loan * 0.95
+            current_fund += potential_new_loan * 0.95 # 5% 手續費假設
             last_borrow_year = policy_year
             is_borrowing_year = True
 
@@ -78,14 +82,11 @@ for age in range(start_age + 1, start_age + 51):
     death_base = IAT2_DEATH_DATA[policy_year] * (annual_pay / 120918)
     
     row = {"保單年度": policy_year, "年齡": f"{age} {'⚡' if is_borrowing_year else ''}"}
-    
-    # 判斷顯示數值是否需要除以 12
     divisor = 12 if is_monthly_view else 1
     col_suffix = "(月)" if is_monthly_view else ""
 
     if "以息養險" in mode:
         actual_pay = nominal_premium - net_income
-        # 累積數值永遠維持年總額計算，僅顯示值改變
         if actual_pay > 0: accum_real_cost += actual_pay
         else: accum_cash_out += abs(actual_pay)
         
@@ -121,4 +122,3 @@ def style_row(s):
     return ['background-color: #fffbe6;' if highlights[i] else '' for i in range(len(s))]
 
 st.dataframe(df.style.apply(style_row, axis=0), use_container_width=True, height=600, hide_index=True)
-st.caption("💡 註：開啟「月繳顯示」時，①、②、③、⑥ 欄位將自動換算為每月平均值，方便預算規劃。")
