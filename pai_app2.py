@@ -49,7 +49,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. 核心數據：IAT2 (擷取自 PDF 建議書) ---
+# --- 3. 核心數據：IAT2 (37歲女，年繳 120,918) [cite: 1, 10] ---
 IAT2_BASE_PREMIUM = 120918 
 IAT2_CV_DATA = [0, 57241, 161215, 280011, 414148, 563983, 722004, 745788, 762729, 780050, 797711, 815762, 834207, 853051, 872256, 892170, 912497, 933250, 954474, 976139, 998284, 1020880, 1043933, 1067496, 1091523, 1116366, 1141780, 1167738, 1194193, 1221201, 1248731, 1276880, 1305516, 1334739, 1364433, 1395712, 1427683, 1460369, 1493739, 1527863, 1562718, 1598291, 1634634, 1671738, 1709575, 1748178, 1787558, 1827752, 1868643, 1910310, 1952764, 1995964, 2039829, 2084438, 2129682, 2175900, 2222877, 2270575, 2319052, 2368279, 2418279, 2468979, 2520481, 2572804, 2625837, 2679680, 2734352, 2789925, 2846357, 2903802, 2962153, 3021701, 3082687, 3146580, 3200603]
 IAT2_DEATH_DATA = [0, 126468, 321248, 525515, 734419, 829592, 1020884, 1042505, 1064500, 1087000, 1109882, 1133237, 1157070, 1181428, 1206147, 1061997, 1085248, 1108966, 1133198, 1157911, 1183148, 1208876, 1235103, 1261924, 1289210, 1216901, 1244068, 1271740, 1299990, 1328795, 1358120, 1388107, 1418622, 1449725, 1481299, 1419520, 1451866, 1484970, 1518800, 1553341, 1588614, 1624646, 1661449, 1699012, 1737309, 1776371, 1816211, 1856864, 1898257, 1940424, 1983338, 2027039, 2071405, 2116516, 2162260, 2192816, 2239250, 2286321, 2334047, 2382480, 2431561, 2481342, 2531842, 2583120, 2635109, 2687867, 2741411, 2795815, 2850993, 2907018, 2963907, 3021743, 3082687, 3146580, 3200603]
@@ -75,31 +75,45 @@ with st.sidebar:
     st.divider()
     is_monthly_view = st.toggle("📅 切換為「月繳」顯示", value=False)
     mode = st.radio("🔄 策略模式", ["🛡️ 以息養險 (折抵保費)", "🚀 階梯槓桿 (複利滾存)"])
-    st.info("💡 邏輯：每 3 年自動執行滾存借款，無最低門檻限制。")
+    st.info("⚡ 借款邏輯修正：\n1. 首次借款需滿 30 萬。\n2. 啟動後每 3 年增貸投入。")
 
 # --- 5. 核心計算邏輯 ---
-st.title("📊 IAT2 策略全能計算機 (資產結算版)")
+st.title("📊 IAT2 策略全能計算機 (門檻修正版)")
 
 annual_pay = monthly_deposit * 12
 data_rows, highlights = [], []
+# 變數初始化
 current_loan, current_fund, accum_cash_out, accum_net_wealth, accum_real_cost, last_borrow_year = 0, 0, 0, 0, 0, 0
-v65 = {} # 存放 65 歲快照
+has_started_borrowing = False
+v65 = {}
 
 for age in range(start_age + 1, start_age + 51):
     policy_year = age - start_age
     cv = IAT2_CV_DATA[policy_year] * (annual_pay / 120918)
     limit_rate = get_loan_limit_rate(policy_year)
+    max_available_loan = cv * limit_rate
     
     is_borrowing_year = False
     if age <= 75: 
-        max_available_loan = cv * limit_rate
-        potential_new_loan = max_available_loan - current_loan
-        # 只要有新增空間且滿 3 年就借
-        if potential_new_loan > 0 and (last_borrow_year == 0 or (policy_year - last_borrow_year) >= 3):
-            current_loan = max_available_loan
-            current_fund += potential_new_loan * 0.95
-            last_borrow_year = policy_year
-            is_borrowing_year = True
+        # --- 修正後的借款邏輯 ---
+        if not has_started_borrowing:
+            # 首次借款：必須滿 30 萬
+            if max_available_loan >= 300000:
+                new_borrow = max_available_loan
+                current_loan = max_available_loan
+                current_fund += new_borrow * 0.95 # 扣除手續費
+                last_borrow_year = policy_year
+                has_started_borrowing = True
+                is_borrowing_year = True
+        else:
+            # 後續增貸：每三年一次
+            if (policy_year - last_borrow_year) >= 3:
+                new_borrow = max_available_loan - current_loan
+                if new_borrow > 0:
+                    current_loan = max_available_loan
+                    current_fund += new_borrow * 0.95
+                    last_borrow_year = policy_year
+                    is_borrowing_year = True
 
     highlights.append(is_borrowing_year)
     net_income = current_fund * 0.07
@@ -116,7 +130,6 @@ for age in range(start_age + 1, start_age + 51):
         else: accum_cash_out += abs(actual_pay)
         total_nw = cv + current_fund + accum_cash_out - current_loan
         total_db = death_base + current_fund - current_loan
-        
         row.update({
             f"①年繳保費{col_suffix}": format_money(nominal_premium / divisor),
             f"②配息抵扣{col_suffix}": format_money(net_income / divisor),
@@ -137,25 +150,21 @@ for age in range(start_age + 1, start_age + 51):
             "②累積本金": format_money(annual_pay * min(policy_year, 6)),
             "③IAT2解約金": format_money(cv),
             "④保單借款": f"{format_money(-current_loan)} ({int(limit_rate*100)}%)",
-            "⑤基金本本": format_money(current_fund),
+            "⑤基金本金": format_money(current_fund),
             f"⑥年度淨配息{col_suffix}": format_money(net_income / divisor),
             "⑦累積配息": format_money(accum_net_wealth),
             "⑧總淨資產": format_money(total_nw),
             "⑨身故金": format_money(total_db)
         })
-    
     data_rows.append(row)
-    if age == 65: # 抓取 65 歲數據
+    if age == 65:
         v65 = {"cv": cv, "fund": current_fund, "loan": current_loan, "extra": accum_cash_out if "以息養險" in mode else accum_net_wealth, "total": total_nw}
 
-# --- 6. 樣式與表格輸出 ---
+# --- 6. 表格輸出 ---
 df = pd.DataFrame(data_rows)
-def style_row(s):
-    return ['background-color: #fffbe6;' if highlights[i] else '' for i in range(len(s))]
+st.dataframe(df.style.apply(lambda s: ['background-color: #fffbe6;' if highlights[i] else '' for i in range(len(s))], axis=0), use_container_width=True, height=500, hide_index=True)
 
-st.dataframe(df.style.apply(style_row, axis=0), use_container_width=True, height=500, hide_index=True)
-
-# --- 7. 65 歲資產結算看板 ---
+# --- 7. 65 歲結算看板 ---
 if v65:
     extra_label = "累積已領回現金" if "以息養險" in mode else "累積配息滾存(複利)"
     st.markdown(f"""
@@ -168,6 +177,5 @@ if v65:
         <div class="verify-total">
             <span>[=] 總淨資產 (Total Net Worth)</span> <span>{format_money(v65['total'])}</span>
         </div>
-        <div class="verify-note">💡 說明：此數值代表 65 歲時，若結清所有資產並償還借款後，您口袋裡實拿的現金總額。</div>
     </div>
     """, unsafe_allow_html=True)
