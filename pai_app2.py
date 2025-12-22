@@ -5,7 +5,7 @@ import numpy as np
 # --- 1. 頁面基礎設定 ---
 st.set_page_config(
     page_title="IAT2 策略全能計算機",
-    page_icon="🏦",
+    page_icon="🎨",
     layout="wide"
 )
 
@@ -32,37 +32,9 @@ def check_password():
 if not check_password():
     st.stop()
 
-# --- 2. CSS 樣式注入 ---
-st.markdown("""
-    <style>
-    :root {
-        --brand-color: #003a8c;
-        --brand-bg: #f0f5ff;
-        --text-main: #262626;
-        --pay-text: #389e0d;
-        --receive-text: #c41d7f;
-        --debt-color: #cf1322;
-        --asset-text: #096dd9;
-    }
-    h1, h2, h3 { color: var(--brand-color) !important; font-family: -apple-system, sans-serif; }
-    .verify-box {
-        background-color: #262626;
-        color: white;
-        padding: 24px;
-        border-radius: 10px;
-        margin-top: 24px;
-        font-family: monospace;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    }
-    .verify-title { color: #faad14; font-weight: bold; margin-bottom: 15px; border-bottom: 1px solid #434343; padding-bottom: 10px; font-size: 16px; }
-    .verify-row { display: flex; justify-content: space-between; margin-bottom: 8px; align-items: center; }
-    .verify-total { font-size: 20px; font-weight: bold; color: #52c41a; margin-top: 15px; border-top: 1px solid #555; padding-top: 15px; display: flex; justify-content: space-between; }
-    </style>
-""", unsafe_allow_html=True)
-
-# --- 3. IAT2 資料與核心函式 ---
-IAT2_BASE_PREMIUM = 120918
-# 根據 PDF 試算表匯入數據 
+# --- 2. 核心數據：IAT2 (新吉好利 37歲女) ---
+IAT2_BASE_PREMIUM = 120918 # [cite: 4, 6]
+# 導入 PDF 中各年度解約金數據 [cite: 10, 13]
 IAT2_CV_DATA = [
     0, 57241, 161215, 280011, 414148, 563983, 722004, 745788, 762729, 780050, 797711, 
     815762, 834207, 853051, 872256, 892170, 912497, 933250, 954474, 976139, 998284, 
@@ -74,6 +46,7 @@ IAT2_CV_DATA = [
     3021701, 3082687, 3146580, 3200603
 ]
 
+# 導入 PDF 中身故金數據 [cite: 10, 13]
 IAT2_DEATH_DATA = [
     0, 126468, 321248, 525515, 734419, 829592, 1020884, 1042505, 1064500, 1087000, 1109882,
     1133237, 1157070, 1181428, 1206147, 1061997, 1085248, 1108966, 1133198, 1157911, 1183148,
@@ -85,23 +58,12 @@ IAT2_DEATH_DATA = [
     3021743, 3082687, 3146580, 3200603
 ]
 
-# --- 核心更新：根據附件圖表修正借款成數 ---
 def get_loan_limit_rate(year):
-    if year >= 4: return 0.90  # 4年(含)以上為 90%
-    if year == 3: return 0.85  # 第3年為 85%
-    if year == 2: return 0.80  # 第2年為 80%
-    if year == 1: return 0.75  # 第1年為 75%
+    if year >= 4: return 0.90
+    if year == 3: return 0.85
+    if year == 2: return 0.80
+    if year == 1: return 0.75
     return 0
-
-def get_iat2_cv(year, annual_deposit):
-    if year <= 0: return 0
-    idx = year if year < len(IAT2_CV_DATA) else len(IAT2_CV_DATA) - 1
-    return IAT2_CV_DATA[idx] * (annual_deposit / IAT2_BASE_PREMIUM)
-
-def get_iat2_death(year, annual_deposit):
-    if year <= 0: return 0
-    idx = year if year < len(IAT2_DEATH_DATA) else len(IAT2_DEATH_DATA) - 1
-    return IAT2_DEATH_DATA[idx] * (annual_deposit / IAT2_BASE_PREMIUM)
 
 def format_money(val, is_receive_column=False):
     if val == 0: return "-"
@@ -111,17 +73,17 @@ def format_money(val, is_receive_column=False):
     elif val < 0: return f"-{money_str}"
     return money_str
 
-# --- 4. 側邊欄 ---
+# --- 3. 側邊欄 ---
 with st.sidebar:
-    st.header("⚙️ IAT2 參數設定")
+    st.header("⚙️ 參數設定")
     start_age = st.number_input("🧑‍💼 投保年齡", value=37, min_value=0, max_value=80)
     monthly_deposit = st.number_input("💵 月存金額", value=10076, step=1000)
     st.divider()
     mode = st.radio("🔄 選擇策略模式", ["🛡️ 以息養險 (折抵保費)", "🚀 階梯槓桿 (複利滾存)"])
-    st.info("💡 借款成數已更新：\n1年:75% / 2年:80% / 3年:85% / 4年+:90%")
+    st.info("💡 邏輯：每 3 年檢查一次，可借金額需滿 30 萬。")
 
-# --- 5. 主畫面與計算 ---
-st.title("📊 IAT2 策略全能計算機 (精準借款版)")
+# --- 4. 計算邏輯 ---
+st.title("📊 IAT2 策略全能計算機 (色彩重點版)")
 
 annual_deposit = monthly_deposit * 12
 deposit_years = 6
@@ -129,18 +91,20 @@ fee_rate = 0.05
 MIN_LOAN_THRESHOLD = 300000 
 LOAN_INTERVAL_YEARS = 3 
 
-data_rows, raw_data_rows = [], []
+data_rows = []
+raw_highlights = [] # 用來存儲哪些列需要標色
 current_loan, current_fund, accum_cash_out, accum_net_wealth, accum_real_cost, last_borrow_year = 0, 0, 0, 0, 0, 0
 
 for age in range(start_age + 1, start_age + 51):
     policy_year = age - start_age
-    cv = get_iat2_cv(policy_year, annual_deposit)
-    limit_rate = get_loan_limit_rate(policy_year) # 調用更新後的成數
+    cv = IAT2_CV_DATA[policy_year] * (annual_deposit / IAT2_BASE_PREMIUM)
+    limit_rate = get_loan_limit_rate(policy_year)
     
     loan_tag, is_borrowing_year = "", False
     if age <= 65:
         max_loan = cv * limit_rate
         new_borrow = max_loan - current_loan
+        # 每三年借款邏輯
         if new_borrow >= MIN_LOAN_THRESHOLD and (last_borrow_year == 0 or (policy_year - last_borrow_year) >= LOAN_INTERVAL_YEARS):
             current_loan += new_borrow
             current_fund += new_borrow * (1 - fee_rate)
@@ -150,44 +114,61 @@ for age in range(start_age + 1, start_age + 51):
 
     net_income = current_fund * 0.07
     nominal_premium = annual_deposit if policy_year <= deposit_years else 0
-    death_benefit_base = get_iat2_death(policy_year, annual_deposit)
+    death_benefit_base = IAT2_DEATH_DATA[policy_year] * (annual_deposit / IAT2_BASE_PREMIUM)
     
-    row_display = {"保單年度": policy_year, "年齡": f"{age} {loan_tag}"}
-    
+    row = {"保單年度": policy_year, "年齡": f"{age} {loan_tag}"}
+    raw_highlights.append(is_borrowing_year)
+
     if "以息養險" in mode:
-        actual_pay_yearly = nominal_premium - net_income
-        if actual_pay_yearly > 0: accum_real_cost += actual_pay_yearly
-        else: accum_cash_out += abs(actual_pay_yearly)
-        total_net_asset = cv + current_fund + accum_cash_out - current_loan
-        total_death_benefit = death_benefit_base + current_fund - current_loan
-        row_display.update({
-            "①應繳年保費": format_money(nominal_premium),
+        actual_pay = nominal_premium - net_income
+        if actual_pay > 0: accum_real_cost += actual_pay
+        else: accum_cash_out += abs(actual_pay)
+        total_asset = cv + current_fund + accum_cash_out - current_loan
+        total_death = death_benefit_base + current_fund - current_loan
+        row.update({
+            "①年繳保費": format_money(nominal_premium),
             "②配息抵扣": format_money(net_income),
-            "③實繳金額": format_money(actual_pay_yearly, is_receive_column=True),
+            "③實繳金額": format_money(actual_pay, True),
             "④累積實繳": format_money(accum_real_cost),
             "⑤IAT2解約金": format_money(cv),
             "⑥保單借款": f"{format_money(-current_loan)} ({int(limit_rate*100)}%)",
             "⑦基金本金": format_money(current_fund),
-            "⑧總淨資產": format_money(total_net_asset),
-            "⑨身故金": format_money(total_death_benefit)
+            "⑧總淨資產": format_money(total_asset),
+            "⑨身故金": format_money(total_death)
         })
     else:
         accum_net_wealth = (accum_net_wealth * 1.07) + net_income
-        total_net_asset = cv + current_fund + accum_net_wealth - current_loan
-        total_death_benefit = death_benefit_base + current_fund + accum_net_wealth - current_loan
-        row_display.update({
+        total_asset = cv + current_fund + accum_net_wealth - current_loan
+        total_death = death_benefit_base + current_fund + accum_net_wealth - current_loan
+        row.update({
             "①當年存入": format_money(nominal_premium),
             "②累積本金": format_money(annual_deposit * min(policy_year, 6)),
             "③IAT2解約金": format_money(cv),
             "④保單借款": f"{format_money(-current_loan)} ({int(limit_rate*100)}%)",
             "⑤基金本金": format_money(current_fund),
             "⑥年度淨配息": format_money(net_income),
-            "⑦累積配息(複利)": format_money(accum_net_wealth),
-            "⑧總淨資產": format_money(total_net_asset),
-            "⑨身故金": format_money(total_death_benefit)
+            "⑦累積配息": format_money(accum_net_wealth),
+            "⑧總淨資產": format_money(total_asset),
+            "⑨身故金": format_money(total_death)
         })
-    data_rows.append(row_display)
+    data_rows.append(row)
 
-# --- 6. 顯示表格 ---
-st.dataframe(pd.DataFrame(data_rows), use_container_width=True, height=600, hide_index=True)
-st.caption("註：借款成數參考富邦人壽最新公佈之借款上限表修正。")
+# --- 5. 表格樣式處理 ---
+df = pd.DataFrame(data_rows)
+
+def highlight_loan_years(s):
+    # 定義一個樣式列表
+    styles = ['' for _ in s]
+    # 如果 raw_highlights 相對應的 index 為 True，則套用背景色
+    for i in range(len(s)):
+        if raw_highlights[i]:
+            styles[i] = 'background-color: #fffbe6; color: #856404;' # 淺黃色背景
+    return styles
+
+styler = df.style.apply(highlight_loan_years, axis=0)
+
+# 顯示表格
+st.dataframe(styler, use_container_width=True, height=600, hide_index=True)
+
+st.divider()
+st.markdown("💡 **顏色標註說明**：淺黃色底色列位代表該年度執行了**保單借款槓桿**（⚡），基金本金已於該年放大。")
