@@ -12,7 +12,7 @@ st.set_page_config(
 # --- 1.5 密碼驗證模組 ---
 def check_password():
     """Returns `True` if the user had a correct password."""
-    ACTUAL_PASSWORD = "TP927" # <--- 密碼設定
+    ACTUAL_PASSWORD = "Fubon" # <--- 密碼設定
 
     def password_entered():
         if st.session_state["password"] == ACTUAL_PASSWORD:
