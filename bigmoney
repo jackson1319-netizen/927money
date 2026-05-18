@@ -351,7 +351,7 @@
 <script>
     // ==========================================
     // 🔒 設定您的密碼
-    const MY_ACCESS_PASSWORD = "TP927"; 
+    const MY_ACCESS_PASSWORD = "Fubon"; 
     // 🖼️ Banner
     const BANNER_IMAGE_URL = "https://i.postimg.cc/G2JSDD08/Gemini-Generated-Image-7xa57e7xa57e7xa5.png"; 
     // ==========================================
