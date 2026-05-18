@@ -11,7 +11,7 @@ st.set_page_config(
 
 # --- 1.5 密碼驗證模組 ---
 def check_password():
-    ACTUAL_PASSWORD = "TP927"
+    ACTUAL_PASSWORD = "Fubon"
     if "password_correct" not in st.session_state:
         st.text_input("🔒 請輸入訪問密碼", type="password", on_change=lambda: st.session_state.update({"password_correct": st.session_state["password"] == ACTUAL_PASSWORD}), key="password")
         return False
